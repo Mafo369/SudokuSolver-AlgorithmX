@@ -150,6 +150,33 @@ SudokuImage.cpp.s:
 	$(MAKE) -f CMakeFiles/SudokuImage.dir/build.make CMakeFiles/SudokuImage.dir/SudokuImage.cpp.s
 .PHONY : SudokuImage.cpp.s
 
+digitrecognizer.o: digitrecognizer.cpp.o
+
+.PHONY : digitrecognizer.o
+
+# target to build an object file
+digitrecognizer.cpp.o:
+	$(MAKE) -f CMakeFiles/SudokuImage.dir/build.make CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o
+.PHONY : digitrecognizer.cpp.o
+
+digitrecognizer.i: digitrecognizer.cpp.i
+
+.PHONY : digitrecognizer.i
+
+# target to preprocess a source file
+digitrecognizer.cpp.i:
+	$(MAKE) -f CMakeFiles/SudokuImage.dir/build.make CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.i
+.PHONY : digitrecognizer.cpp.i
+
+digitrecognizer.s: digitrecognizer.cpp.s
+
+.PHONY : digitrecognizer.s
+
+# target to generate assembly for a file
+digitrecognizer.cpp.s:
+	$(MAKE) -f CMakeFiles/SudokuImage.dir/build.make CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.s
+.PHONY : digitrecognizer.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -162,6 +189,9 @@ help:
 	@echo "... SudokuImage.o"
 	@echo "... SudokuImage.i"
 	@echo "... SudokuImage.s"
+	@echo "... digitrecognizer.o"
+	@echo "... digitrecognizer.i"
+	@echo "... digitrecognizer.s"
 .PHONY : help
 
 

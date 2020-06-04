@@ -11,6 +11,8 @@ opencv2/opencv.hpp
 -
 opencv2/ml.hpp
 -
+digitrecognizer.h
+/home/mafo/dev/sudoku/digitrecognizer.h
 stdlib.h
 -
 stdio.h
@@ -20,6 +22,20 @@ iostream
 dirent.h
 -
 stdio.h
+-
+
+/home/mafo/dev/sudoku/digitrecognizer.cpp
+digitrecognizer.h
+/home/mafo/dev/sudoku/digitrecognizer.h
+
+/home/mafo/dev/sudoku/digitrecognizer.h
+opencv2/opencv.hpp
+-
+opencv2/ml.hpp
+-
+string
+-
+cerrno
 -
 
 /usr/local/include/opencv4/opencv2/calib3d.hpp

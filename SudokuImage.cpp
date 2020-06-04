@@ -1,6 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/ml.hpp>
 
+#include "digitrecognizer.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include "iostream"
@@ -102,13 +103,84 @@ void printGrid(int grid[N][N]){
 }
 
 
+void drawLine(Vec2f line, Mat &img, Scalar rgb = CV_RGB(0,0,255)){
+    if(line[1]!=0){
+        float m = -1/tan(line[1]);
 
+        float c = line[0]/sin(line[1]);
+
+        cv::line(img, Point(0, c), Point(img.size().width, m*img.size().width+c), rgb);
+    }
+    else{
+        cv::line(img, Point(line[0], 0), Point(line[0], img.size().height), rgb);
+    }
+
+}
+
+void mergeRelatedLines(vector<Vec2f> *lines, Mat &img){
+    vector<Vec2f>::iterator current;
+    for(current=lines->begin();current!=lines->end();current++){
+        if((*current)[0]==0 && (*current)[1]==-100) continue;
+        float p1 = (*current)[0];
+        float theta1 = (*current)[1];
+        Point pt1current, pt2current;
+        if(theta1>CV_PI*45/180 && theta1<CV_PI*135/180){
+            pt1current.x=0;
+
+            pt1current.y = p1/sin(theta1);
+
+            pt2current.x=img.size().width;
+            pt2current.y=-pt2current.x/tan(theta1) + p1/sin(theta1);
+        }
+        else{
+            pt1current.y=0;
+
+            pt1current.x=p1/cos(theta1);
+
+            pt2current.y=img.size().height;
+            pt2current.x=-pt2current.y/tan(theta1) + p1/cos(theta1);
+
+        }
+        vector<Vec2f>::iterator    pos;
+        for(pos=lines->begin();pos!=lines->end();pos++){
+            if(*current==*pos) continue;
+            if(fabs((*pos)[0]-(*current)[0])<20 && fabs((*pos)[1]-(*current)[1])<CV_PI*10/180){
+                float p = (*pos)[0];
+                float theta = (*pos)[1];
+                Point pt1, pt2;
+                if((*pos)[1]>CV_PI*45/180 && (*pos)[1]<CV_PI*135/180){
+                    pt1.x=0;
+                    pt1.y = p/sin(theta);
+                    pt2.x=img.size().width;
+                    pt2.y=-pt2.x/tan(theta) + p/sin(theta);
+                }
+                else{
+                    pt1.y=0;
+                    pt1.x=p/cos(theta);
+                    pt2.y=img.size().height;
+                    pt2.x=-pt2.y/tan(theta) + p/cos(theta);
+                }
+                if(((double)(pt1.x-pt1current.x)*(pt1.x-pt1current.x) + (pt1.y-pt1current.y)*(pt1.y-pt1current.y)<64*64) &&
+                    ((double)(pt2.x-pt2current.x)*(pt2.x-pt2current.x) + (pt2.y-pt2current.y)*(pt2.y-pt2current.y)<64*64))
+                {
+                    // Merge the two
+                    (*current)[0] = ((*current)[0]+(*pos)[0])/2;
+
+                    (*current)[1] = ((*current)[1]+(*pos)[1])/2;
+
+                    (*pos)[0]=0;
+                    (*pos)[1]=-100;
+                }
+            }
+        }
+    }
+}
 
 
 int main( int argc, char* argv[] ){
 	// Read original image 
-	Mat src = imread("sudoku.jpg",IMREAD_UNCHANGED );
-	resize(src,src,Size(540,540),0,0,INTER_NEAREST);
+	Mat src = imread("sudoku.jpg", IMREAD_GRAYSCALE );
+	//resize(src,src,Size(540,540),0,0,INTER_NEAREST);
 
 	//if fail to read the image
 	if (!src.data){
@@ -116,30 +188,41 @@ int main( int argc, char* argv[] ){
 		return -1;
 	}
 	
-	Mat srcb; // Copy of original image but in grey scale
-	cvtColor(src, srcb, COLOR_BGR2GRAY);
-
+	//Mat srcb; // Copy of original image but in grey scale
+	//cvtColor(src, srcb, COLOR_BGR2GRAY);
+    Mat original = src.clone();
 	imshow("original image",src);
-	
-	Mat smooth;
+    
+    /**************************** Thresholding ****************************/ 
+
 	Mat thresholded;
+
+    Mat outerBox = Mat(src.size(), CV_8UC1);
+    //Mat outerBox1 = Mat(src.size(), CV_8UC1);
+
+	GaussianBlur(src, src, Size(11, 11), 0); //removing noises
 	
-	GaussianBlur(srcb, smooth, Size(11, 11), 0, 0); //removing noises
+	adaptiveThreshold(src, outerBox, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 5, 2);// thresholding the image
+    
+    bitwise_not(outerBox, outerBox);    
+
+    Mat kernel = (Mat_<uchar>(3,3) << 0,1,0,1,1,1,0,1,0);
+    dilate(outerBox, outerBox, kernel);
+    imshow("outer box", outerBox);
+
+	//adaptiveThreshold(src, outerBox1, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 5, 2);// thresholding the image
+    //imshow("smooth image", outerBox1);	
 	
-	adaptiveThreshold(smooth, thresholded, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 15, 5);// thresholding the image
+    /***************************** Borders *******************************/
+
+    vector<vector<Point>> contours; 
+	vector<Vec4i> hierarchy;
 	
-	Mat thresholded2 = thresholded.clone();//creating a copy
-	
-	imshow("smooth image",thresholded);
-	
-	vector< vector < Point > >contours; 
-	vector <Vec4i> hierarchy;
-	
-	findContours(thresholded2, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);//FINDING CONTOUR
+	//findContours(outerBox, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);//FINDING CONTOUR
 	
 	//finding the sudoku with max area which will be our main grid
 	double area; double maxarea = 0; int p;
-	for (int i = 0; i < contours.size(); i++){
+	/*for (int i = 0; i < contours.size(); i++){
 		area = contourArea(contours[i], false);
 		if (area > 16){
 			if (area > maxarea){
@@ -148,29 +231,205 @@ int main( int argc, char* argv[] ){
 			}
 		}
 	}
-	
-	
 
 	double perimeter = arcLength(contours[p], true);
 	
 	approxPolyDP(contours[p], contours[p], 0.01*perimeter, true);
 
-	drawContours(src, contours, p, Scalar(255, 0, 0), 1, 8);
-	
+	drawContours(src, contours, p, Scalar(255, 0, 0), 1, 8);*/
 
+    int count=0;
+    int max=-1;
 
-	imshow("countour image",src);
+    Point maxPt;
 
-	
-	
+    for(int y=0;y<outerBox.size().height;y++){
+        uchar *row = outerBox.ptr(y);
+        for(int x=0;x<outerBox.size().width;x++){
+            if(row[x]>=128){
 
-	Point2f entry[4];
-	Point2f out[4];
+                 int area = floodFill(outerBox, Point(x,y), CV_RGB(0,0,64));
+                 if(area>max){
+                     maxPt = Point(x,y);
+                     max = area;
+                 }
+            }
+        }
 
+    }
+
+    floodFill(outerBox, maxPt, CV_RGB(255,255,255));
+    for(int y=0;y<outerBox.size().height;y++){
+        uchar *row = outerBox.ptr(y);
+        for(int x=0;x<outerBox.size().width;x++){
+            if(row[x]==64 && x!=maxPt.x && y!=maxPt.y){
+                int area = floodFill(outerBox, Point(x,y), CV_RGB(0,0,0));
+            }
+        }
+    }
+    erode(outerBox, outerBox, kernel);
+    imshow("borders", outerBox);
+
+	//imshow("countour image",src);
+    
+    /************************** Hough Lines ************************/
+
+    vector<Vec2f> lines;
+    HoughLines(outerBox, lines, 1, CV_PI/180, 200);
+ 
+    /**************************** Merge Lines *************************/
+
+    mergeRelatedLines(&lines, src);
+    for(int i=0;i<lines.size();i++){
+        drawLine(lines[i], outerBox, CV_RGB(0,0,128));
+    }
+    
+    imshow("HoughLines merged", outerBox);        
+
+    /****************************** Extreme Lines ***************************/
+   
+    // Now detect the lines on extremes
+    Vec2f topEdge = Vec2f(1000,1000);    double topYIntercept=100000, topXIntercept=0;
+    Vec2f bottomEdge = Vec2f(-1000,-1000);        double bottomYIntercept=0, bottomXIntercept=0;
+    Vec2f leftEdge = Vec2f(1000,1000);    double leftXIntercept=100000, leftYIntercept=0;
+    Vec2f rightEdge = Vec2f(-1000,-1000);        double rightXIntercept=0, rightYIntercept=0;
+
+    for(int i=0;i<lines.size();i++){
+        Vec2f current = lines[i];
+
+        float p=current[0];
+
+        float theta=current[1];
+
+        if(p==0 && theta==-100)
+            continue;
+        double xIntercept, yIntercept;
+        xIntercept = p/cos(theta);
+        yIntercept = p/(cos(theta)*sin(theta));
+        if(theta>CV_PI*80/180 && theta<CV_PI*100/180){
+            if(p<topEdge[0])
+                topEdge = current;
+
+            if(p>bottomEdge[0])
+                bottomEdge = current;
+        }
+        else if(theta<CV_PI*10/180 || theta>CV_PI*170/180){
+            if(xIntercept>rightXIntercept){
+                rightEdge = current;
+                rightXIntercept = xIntercept;
+            }
+            else if(xIntercept<=leftXIntercept){
+                leftEdge = current;
+                leftXIntercept = xIntercept;
+            }
+        }
+    }
+
+    drawLine(topEdge, src, CV_RGB(0,0,0));
+    drawLine(bottomEdge, src, CV_RGB(0,0,0));
+    drawLine(leftEdge, src, CV_RGB(0,0,0));
+    drawLine(rightEdge, src, CV_RGB(0,0,0));
+
+    Point left1, left2, right1, right2, bottom1, bottom2, top1, top2;
+
+    int height=outerBox.size().height;
+
+    int width=outerBox.size().width;
+
+    if(leftEdge[1]!=0){
+        left1.x=0;        left1.y=leftEdge[0]/sin(leftEdge[1]);
+        left2.x=width;    left2.y=-left2.x/tan(leftEdge[1]) + left1.y;
+    }
+    else{
+        left1.y=0;        left1.x=leftEdge[0]/cos(leftEdge[1]);
+        left2.y=height;    left2.x=left1.x - height*tan(leftEdge[1]);
+
+    }
+    if(rightEdge[1]!=0){
+        right1.x=0;        right1.y=rightEdge[0]/sin(rightEdge[1]);
+        right2.x=width;    right2.y=-right2.x/tan(rightEdge[1]) + right1.y;
+    }
+    else{
+        right1.y=0;        right1.x=rightEdge[0]/cos(rightEdge[1]);
+        right2.y=height;    right2.x=right1.x - height*tan(rightEdge[1]);
+
+    }
+    bottom1.x=0;    bottom1.y=bottomEdge[0]/sin(bottomEdge[1]);
+
+    bottom2.x=width;bottom2.y=-bottom2.x/tan(bottomEdge[1]) + bottom1.y;
+
+    top1.x=0;        top1.y=topEdge[0]/sin(topEdge[1]);
+    top2.x=width;    top2.y=-top2.x/tan(topEdge[1]) + top1.y;
+
+    // Next, we find the intersection of  these four lines
+    double leftA = left2.y-left1.y;
+    double leftB = left1.x-left2.x;
+
+    double leftC = leftA*left1.x + leftB*left1.y;
+
+    double rightA = right2.y-right1.y;
+    double rightB = right1.x-right2.x;
+
+    double rightC = rightA*right1.x + rightB*right1.y;
+
+    double topA = top2.y-top1.y;
+    double topB = top1.x-top2.x;
+
+    double topC = topA*top1.x + topB*top1.y;
+
+    double bottomA = bottom2.y-bottom1.y;
+    double bottomB = bottom1.x-bottom2.x;
+
+    double bottomC = bottomA*bottom1.x + bottomB*bottom1.y;
+
+    // Intersection of left and top
+    double detTopLeft = leftA*topB - leftB*topA;
+
+    Point ptTopLeft = Point((topB*leftC - leftB*topC)/detTopLeft, (leftA*topC - topA*leftC)/detTopLeft);
+
+    // Intersection of top and right
+    double detTopRight = rightA*topB - rightB*topA;
+
+    Point ptTopRight = Point((topB*rightC-rightB*topC)/detTopRight, (rightA*topC-topA*rightC)/detTopRight);
+
+    // Intersection of right and bottom
+    double detBottomRight = rightA*bottomB - rightB*bottomA;
+    Point ptBottomRight = Point((bottomB*rightC-rightB*bottomC)/detBottomRight, (rightA*bottomC-bottomA*rightC)/detBottomRight);// Intersection of bottom and left
+    double detBottomLeft = leftA*bottomB-leftB*bottomA;
+    Point ptBottomLeft = Point((bottomB*leftC-leftB*bottomC)/detBottomLeft, (leftA*bottomC-bottomA*leftC)/detBottomLeft);
+
+    int maxLength = (ptBottomLeft.x-ptBottomRight.x)*(ptBottomLeft.x-ptBottomRight.x) + (ptBottomLeft.y-ptBottomRight.y)*(ptBottomLeft.y-ptBottomRight.y);
+    int temp = (ptTopRight.x-ptBottomRight.x)*(ptTopRight.x-ptBottomRight.x) + (ptTopRight.y-ptBottomRight.y)*(ptTopRight.y-ptBottomRight.y);
+
+    if(temp>maxLength) maxLength = temp;
+
+    temp = (ptTopRight.x-ptTopLeft.x)*(ptTopRight.x-ptTopLeft.x) + (ptTopRight.y-ptTopLeft.y)*(ptTopRight.y-ptTopLeft.y);
+
+    if(temp>maxLength) maxLength = temp;
+
+    temp = (ptBottomLeft.x-ptTopLeft.x)*(ptBottomLeft.x-ptTopLeft.x) + (ptBottomLeft.y-ptTopLeft.y)*(ptBottomLeft.y-ptTopLeft.y);
+
+    if(temp>maxLength) maxLength = temp;
+
+    maxLength = sqrt((double)maxLength);
+    Point2f source[4], dst[4];
+    source[0] = ptTopLeft;            dst[0] = Point2f(0,0);
+    source[1] = ptTopRight;        dst[1] = Point2f(maxLength-1, 0);
+    source[2] = ptBottomRight;        dst[2] = Point2f(maxLength-1, maxLength-1);
+    source[3] = ptBottomLeft;        dst[3] = Point2f(0, maxLength-1);
+    Mat undistorted = Mat(Size(maxLength, maxLength), CV_8UC1);
+    
+    warpPerspective(original, undistorted, getPerspectiveTransform(source, dst), Size(maxLength, maxLength));
+
+    imshow("undistorted", undistorted);
+    //waitKey(0);
+    //Point2f entry[4];
+	//Point2f out[4];
+	//double sum = 0; double prevsum = 0; int a; int b; double diff1; double diff2;  double diffprev2 = 0; double diffprev=0;double prevsum2=contours[p][0].x + contours[p][0].y;
 	
-	double sum = 0; double prevsum = 0; int a; int b; double diff1; double diff2;  double diffprev2 = 0; double diffprev=0;double prevsum2=contours[p][0].x + contours[p][0].y;
-	
-	int c; int d;
+	//int c; int d;
+    //cout << "hey" << endl;
+    /*
 	for (int i = 0; i < 4; i++){
 		sum = contours[p][i].x + contours[p][i].y;
 		diff1 = contours[p][i].x - contours[p][i].y;
@@ -204,10 +463,11 @@ int main( int argc, char* argv[] ){
 	out[2] = Point2f(450, 0);
 	out[3] = Point(0, 450);
 
+    */
 
 	Mat wrap; Mat mat; 
 
-	mat = Mat::zeros(src.size(), src.type());
+	/*mat = Mat::zeros(src.size(), src.type());
 	
 	wrap = getPerspectiveTransform(entry, out);
 	
@@ -215,26 +475,26 @@ int main( int argc, char* argv[] ){
 
 	imshow("sudoku part",mat);
 
-	Mat ch; Mat thresholded31;
+	Mat ch; Mat thresholded2;
 
 	cvtColor(mat,ch,COLOR_BGR2GRAY);
 
 	GaussianBlur(ch, ch, Size(11, 11), 0, 0);
 
-	adaptiveThreshold(ch, thresholded31, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 5, 2);
-	bitwise_not(thresholded31, thresholded31);
+	adaptiveThreshold(ch, thresholded2, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 5, 2);
+	bitwise_not(thresholded2, thresholded2);
 
-	Mat kernel = (Mat_<uchar>(3,3) << 0,1,0,1,1,1,0,1,0);
-    dilate(thresholded31, thresholded31, kernel,Point(-1,-1),1);
+	//Mat kernel = (Mat_<uchar>(3,3) << 0,1,0,1,1,1,0,1,0);
+    //dilate(thresholded2, thresholded2, kernel,Point(-1,-1),1);
 
-	erode(thresholded31,thresholded31,2);
+	erode(thresholded2,thresholded2,2);
 
     int p2=0;int p3=0;
 	
     while(p3<450){
         for(int i=p3;i<p3+10;i++){
 	        for(int j=0;j<450;j++){
-		        thresholded31.at<uchar>(j,i)=0;
+		        thresholded2.at<uchar>(j,i)=0;
 	        }
         }
         p3=p3+50;
@@ -243,7 +503,7 @@ int main( int argc, char* argv[] ){
     while(p2<450){
         for( int i=0;i<450;i++){
 	        for(int j=p2;j<p2+10;j++){
-		        thresholded31.at<uchar>(j,i)=0;
+		        thresholded2.at<uchar>(j,i)=0;
 	        }
         }
         p2=p2+50;
@@ -251,26 +511,66 @@ int main( int argc, char* argv[] ){
 
     for(int i=440;i<450;i++){
 	    for(int j=0;j<450;j++){
-		    thresholded31.at<uchar>(j,i)=0;
+		    thresholded2.at<uchar>(j,i)=0;
 	    }
     }
 
     for(int i=0;i<450;i++){
 	for(int j=440;j<450;j++){
-		thresholded31.at<uchar>(j,i)=0;
+		thresholded2.at<uchar>(j,i)=0;
 	    }
     }
 
     for(int i=0;i<450;i++){
 	    for(int j=150;j<160;j++){
-		    thresholded31.at<uchar>(j,i)=0;
+		    thresholded2.at<uchar>(j,i)=0;
 	    }
 
     }
 
-	imshow("thresholded new",thresholded31);
-	
-    int num = 797;
+	imshow("thresholded new",thresholded2);
+	*/
+
+    /******************************* Number Classification *************************/
+
+    Mat undistortedThreshed = undistorted.clone();
+    adaptiveThreshold(undistorted, undistortedThreshed, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV, 101, 1);
+    imshow("new threshold", undistortedThreshed);
+    //waitKey(0);
+
+    DigitRecognizer *dr = new DigitRecognizer();
+    bool b = dr->train("test_train/train-images.idx3-ubyte", "test_train/train-labels.idx1-ubyte");
+    if(!b)
+        cout << "NOT TRAINING" << endl;
+
+    int dist = ceil((double)maxLength/9);
+    Mat currentCell = Mat(dist, dist, CV_8UC1);
+    for(int j=0;j<9;j++){
+        for(int i=0;i<9;i++){
+            for(int y=0;y<dist && j*dist+y<undistortedThreshed.cols;y++){
+                uchar* ptr = currentCell.ptr(y);
+                for(int x=0;x<dist && i*dist+x<undistortedThreshed.rows;x++){
+                    ptr[x] = undistortedThreshed.at<uchar>(j*dist+y, i*dist+x);
+                }
+            }
+            Moments m = cv::moments(currentCell, true);
+            int area = m.m00;
+            cout << area << "/" << currentCell.rows*currentCell.cols/5 << endl;
+            if(area > currentCell.rows*currentCell.cols/5){
+                int number = dr->classify(currentCell); 
+                //cout << number << endl;
+                cout << number <<" "; 
+            }
+            else{
+                cout <<" ";
+            }
+        }
+        cout << " " << endl; 
+    }
+    cout << endl;
+
+
+    /*int num = 797;
     int size = 16 * 16;
     Mat trainData = Mat(Size(size, num), CV_32FC1);
     Mat responces = Mat(Size(1, num), CV_32FC1);
@@ -327,13 +627,13 @@ int main( int argc, char* argv[] ){
 	
  
     int m = 0, n = 0; Mat smallimage; Mat smallimage2;
-	    for (; m < 450; m = m + 50){
-		    for (n = 0; n < 450; n = n + 50){ 
-			    smallimage = Mat(thresholded31, cv::Rect(n, m, 50, 50));
+	for (; m < 450; m = m + 50){
+		for (n = 0; n < 450; n = n + 50){ 
+			smallimage = Mat(undistortedThreshed, cv::Rect(n, m, 50, 50));
 					
-			    smallt.push_back(smallimage);
-		    }
-	    }
+			smallt.push_back(smallimage);
+		}
+	}
 
 	
 	
@@ -342,13 +642,13 @@ int main( int argc, char* argv[] ){
 		Mat img123 =Mat(Size(size, 1), CV_32FC1);
 		if(countNonZero(smallt[i])>200){
 		
-			Mat thresholded32; Mat regionOfInterest; Mat img12;
+			Mat thresholded3; Mat regionOfInterest; Mat img12;
 		
-			thresholded32=smallt[i].clone();
+			thresholded3=smallt[i].clone();
 
 			vector < vector <Point> >contours2;
 			
-			findContours(thresholded32, contours2, RETR_LIST, CHAIN_APPROX_SIMPLE);
+			findContours(thresholded3, contours2, RETR_LIST, CHAIN_APPROX_SIMPLE);
 
 			Rect prevb; double areaprev = 0; double area2; int q;
 
@@ -391,10 +691,10 @@ int main( int argc, char* argv[] ){
 		}
 		else z[i/9][i%9]=0;
     }
-
-	for(int i=0;i<9;i++){
+    */
+	/*for(int i=0;i<9;i++){
 		for(int j=0;j<9;j++){
-			cout << z[i][j]<<" ";
+			//cout << z[i][j]<<" ";
 		}
 		cout<<endl;
 	}
@@ -404,7 +704,7 @@ int main( int argc, char* argv[] ){
 
 	for(int i=0;i<9;i++){
 		for(int j=0;j<9;j++){
-			grid[i][j]=z[i][j];
+			//grid[i][j]=z[i][j];
 		}
 	}
 
@@ -413,7 +713,7 @@ int main( int argc, char* argv[] ){
 	else	
 		cout << "please correct" << endl;
 		
-
+    */
 	waitKey(0);
 	return 0;
 }
