@@ -62,13 +62,13 @@ bool DigitRecognizer::train(string trainPath, string labelsPath)
     // label for each digit
 
     int size = numRows*numCols;
+    cout << "Size : " << size << endl;
+    Mat trainingVectors = Mat(Size(size, numImages), CV_32FC1);
 
-    Mat trainingVectors = Mat(numImages, size, CV_32FC1);
-
-    Mat trainingClasses = Mat(numImages, 1, CV_32FC1);
+    Mat trainingClasses = Mat(Size(1, numImages), CV_32FC1);
 
 
-    memset(trainingClasses.data, 0, sizeof(float)*numImages);
+    //memset(trainingClasses.data, 0, sizeof(float)*numImages);
 
     BYTE temp[size];
     BYTE tempClass=0;
@@ -94,19 +94,21 @@ bool DigitRecognizer::train(string trainPath, string labelsPath)
     //kk1->train(trainingVectors, ml::ROW_SAMPLE, trainingClasses);   
     //std::cout << "Hey" << std::endl;
     bool l = knn->train(trainingVectors, ml::ROW_SAMPLE,trainingClasses);
-    if(!l)
-        std::cout << "training failed" << std::endl;
-
+    if(knn->isTrained())
+        std::cout << "training succ" << std::endl;
+    float prediction = knn->predict(1, noArray(), 0);
+    std::cout << prediction << std::endl;
     return true;
 }
 
-int DigitRecognizer::classify(cv::Mat img)
-{
+float DigitRecognizer::classify(cv::Mat img)
+{   
+    imshow("before process", img);
     Mat cloneImg = preprocessImage(img);
-    imshow("number", cloneImg);
+    imshow("after process" , cloneImg);
     waitKey(0);
     Mat response, dist;
-    return knn->findNearest(Mat_<float>(cloneImg), 1, noArray(), response, dist);
+    return knn->findNearest(Mat_<float>(cloneImg), 1, response, noArray(), noArray());
 }
 
 Mat DigitRecognizer::preprocessImage(Mat img)
@@ -185,9 +187,7 @@ Mat DigitRecognizer::preprocessImage(Mat img)
         floodFill(cloneImg, Point(i, 0), Scalar(0));
         floodFill(cloneImg, Point(i, cloneImg.rows-1), Scalar(0));
     }
-
-    cloneImg = cloneImg.reshape(1, 1);
-
+    cloneImg = cloneImg.reshape(1,1);
     return cloneImg;
 }
 

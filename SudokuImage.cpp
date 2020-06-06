@@ -177,6 +177,90 @@ void mergeRelatedLines(vector<Vec2f> *lines, Mat &img){
 }
 
 
+
+Mat preprocessImage(Mat img, int numRows, int numCols)
+{
+
+    int rowTop=-1, rowBottom=-1, colLeft=-1, colRight=-1;
+
+    Mat temp;
+    int thresholdBottom = 50;
+    int thresholdTop = 50;
+    int thresholdLeft = 50;
+    int thresholdRight = 50;
+    int center = img.rows/2;
+    for(int i=center;i<img.rows;i++){
+        if(rowBottom==-1)
+        {
+            temp = img.row(i);
+            Mat stub = temp;
+            if(sum(stub).val[0] < thresholdBottom || i==img.rows-1)
+                rowBottom = i;
+
+        }
+
+        if(rowTop==-1)
+        {
+            temp = img.row(img.rows-i);
+            Mat stub = temp;
+            if(sum(stub).val[0] < thresholdTop || i==img.rows-1)
+                rowTop = img.rows-i;
+
+        }
+        if(colRight==-1)
+        {
+            temp = img.col(i);
+            Mat stub = temp;
+            if(sum(stub).val[0] < thresholdRight|| i==img.cols-1)
+                colRight = i;
+
+        }
+
+        if(colLeft==-1)
+        {
+            temp = img.col(img.cols-i);
+            Mat stub = temp;
+            if(sum(stub).val[0] < thresholdLeft|| i==img.cols-1)
+                colLeft = img.cols-i;
+        }
+    }
+    Mat newImg;
+
+    newImg = newImg.zeros(img.rows, img.cols, CV_8UC1);
+
+    int startAtX = (newImg.cols/2)-(colRight-colLeft)/2;
+
+    int startAtY = (newImg.rows/2)-(rowBottom-rowTop)/2;
+
+    for(int y=startAtY;y<(newImg.rows/2)+(rowBottom-rowTop)/2;y++)
+    {
+        uchar *ptr = newImg.ptr<uchar>(y);
+        for(int x=startAtX;x<(newImg.cols/2)+(colRight-colLeft)/2;x++)
+        {
+            ptr[x] = img.at<uchar>(rowTop+(y-startAtY),colLeft+(x-startAtX));
+        }
+    }
+
+    Mat cloneImg = Mat(numRows, numCols, CV_8UC1);
+    resize(newImg, cloneImg, Size(numRows, numCols), 1, 1 , INTER_LINEAR);
+
+    // Now fill along the borders
+    for(int i=0;i<cloneImg.rows;i++)
+    {
+        floodFill(cloneImg, Point(0, i), Scalar(0,0,0));
+
+        floodFill(cloneImg, Point(cloneImg.cols-1, i), Scalar(0,0,0));
+
+        floodFill(cloneImg, Point(i, 0), Scalar(0));
+        floodFill(cloneImg, Point(i, cloneImg.rows-1), Scalar(0));
+    }
+    imshow("clone img", cloneImg);
+    waitKey(0);
+    cloneImg = cloneImg.reshape(1,1);
+    return cloneImg;
+}
+
+
 int main( int argc, char* argv[] ){
 	// Read original image 
 	Mat src = imread("sudoku.jpg", IMREAD_GRAYSCALE );
@@ -538,39 +622,13 @@ int main( int argc, char* argv[] ){
     imshow("new threshold", undistortedThreshed);
     //waitKey(0);
 
-    DigitRecognizer *dr = new DigitRecognizer();
+    /*DigitRecognizer *dr = new DigitRecognizer();
     bool b = dr->train("test_train/train-images.idx3-ubyte", "test_train/train-labels.idx1-ubyte");
     if(!b)
         cout << "NOT TRAINING" << endl;
+    */
 
-    int dist = ceil((double)maxLength/9);
-    Mat currentCell = Mat(dist, dist, CV_8UC1);
-    for(int j=0;j<9;j++){
-        for(int i=0;i<9;i++){
-            for(int y=0;y<dist && j*dist+y<undistortedThreshed.cols;y++){
-                uchar* ptr = currentCell.ptr(y);
-                for(int x=0;x<dist && i*dist+x<undistortedThreshed.rows;x++){
-                    ptr[x] = undistortedThreshed.at<uchar>(j*dist+y, i*dist+x);
-                }
-            }
-            Moments m = cv::moments(currentCell, true);
-            int area = m.m00;
-            cout << area << "/" << currentCell.rows*currentCell.cols/5 << endl;
-            if(area > currentCell.rows*currentCell.cols/5){
-                int number = dr->classify(currentCell); 
-                //cout << number << endl;
-                cout << number <<" "; 
-            }
-            else{
-                cout <<" ";
-            }
-        }
-        cout << " " << endl; 
-    }
-    cout << endl;
-
-
-    /*int num = 797;
+    int num = 797;
     int size = 16 * 16;
     Mat trainData = Mat(Size(size, num), CV_32FC1);
     Mat responces = Mat(Size(1, num), CV_32FC1);
@@ -621,12 +679,44 @@ int main( int argc, char* argv[] ){
     knn = KNearest::create();
 
     knn->train(trainData,ROW_SAMPLE,responces);
- 	
-	
-    vector <Mat> small; vector <Mat> smallt;
+ 
+    
+    int dist = ceil((double)maxLength/9);
+    Mat currentCell = Mat(dist, dist, CV_8UC1);
+    for(int j=0;j<9;j++){
+        for(int i=0;i<9;i++){
+            for(int y=0;y<dist && j*dist+y<undistortedThreshed.cols;y++){
+                uchar* ptr = currentCell.ptr(y);
+                for(int x=0;x<dist && i*dist+x<undistortedThreshed.rows;x++){
+                    ptr[x] = undistortedThreshed.at<uchar>(j*dist+y, i*dist+x);
+                }
+            }
+            Moments m = cv::moments(currentCell, true);
+            int area = m.m00;
+            //imshow("current cell", currentCell);
+            Mat cellClone = currentCell.clone();
+            if(area > cellClone.rows*cellClone.cols/5){
+                cellClone = preprocessImage(cellClone, 16, 16);
+                cellClone.convertTo(cellClone, CV_32FC1, 1.0/255.0);             
+                waitKey(0); 
+		        Mat response, dist;
+                resize(cellClone, cellClone, Size(16,16 ),0,0,INTER_NEAREST);		
+			    float p=knn->findNearest(cellClone.reshape(1,1),1, noArray(), response, dist);
+                cout << "P: " << p << endl;
+                //cout << p <<" "; 
+            }
+            else{
+                //cout <<" ";
+            }
+        }
+        //cout << " " << endl; 
+    }
+    cout << endl;
+
+    //vector <Mat> small; vector <Mat> smallt;
 	
  
-    int m = 0, n = 0; Mat smallimage; Mat smallimage2;
+    /*int m = 0, n = 0; Mat smallimage; Mat smallimage2;
 	for (; m < 450; m = m + 50){
 		for (n = 0; n < 450; n = n + 50){ 
 			smallimage = Mat(undistortedThreshed, cv::Rect(n, m, 50, 50));
@@ -634,9 +724,7 @@ int main( int argc, char* argv[] ){
 			smallt.push_back(smallimage);
 		}
 	}
-
-	
-	
+    
     int z[9][9];
 	for(size_t i=0;i<smallt.size();i++){
 		Mat img123 =Mat(Size(size, 1), CV_32FC1);
@@ -680,7 +768,7 @@ int main( int argc, char* argv[] ){
 			    for(int k=0;k<size;k++){
 				    img123.at<float>(k) = img12.at<float>(k);
 			    }
-			
+	            		
 		        Mat response, dist;		
 			    float p=knn->findNearest(img123.reshape(1,1),1, noArray(), response, dist);
 			
@@ -691,8 +779,8 @@ int main( int argc, char* argv[] ){
 		}
 		else z[i/9][i%9]=0;
     }
-    */
-	/*for(int i=0;i<9;i++){
+    
+	for(int i=0;i<9;i++){
 		for(int j=0;j<9;j++){
 			//cout << z[i][j]<<" ";
 		}

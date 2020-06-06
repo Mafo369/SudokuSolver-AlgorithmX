@@ -16,7 +16,7 @@ public:
 
     bool train(string trainPath, string labelsPath);
 
-    int classify(Mat img);
+    float classify(Mat img);
 
 private:
     Mat preprocessImage(Mat img);
