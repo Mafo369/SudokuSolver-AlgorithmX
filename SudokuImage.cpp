@@ -195,7 +195,7 @@ int readFlippedInteger(FILE *fp)
 
 }
 
-inline uint_32 EndianSwap (uint_32 a)
+inline uint32_t EndianSwap (uint32_t a)
 {
     return (a<<24) | ((a<<8) & 0x00ff0000) |
            ((a>>8) & 0x0000ff00) | (a>>24);
