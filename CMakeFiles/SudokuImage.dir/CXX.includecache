@@ -23,6 +23,8 @@ dirent.h
 -
 stdio.h
 -
+stdint.h
+-
 
 /home/mafo/dev/sudoku/digitrecognizer.cpp
 digitrecognizer.h

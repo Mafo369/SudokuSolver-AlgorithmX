@@ -11,6 +11,7 @@ using namespace std;
 using namespace ml;
 
 #include <stdio.h>
+#include <stdint.h>
 
 // UNASSIGNED is used for empty cells in sudoku
 #define UNASSIGNED 0
@@ -18,6 +19,7 @@ using namespace ml;
 // N is used for size of Sudoku grid. Size will be NxN
 #define N 9
 
+typedef unsigned char BYTE;
 
 bool FindUnassignedLocation(int grid[N][N], int &row, int &col);
 
@@ -176,7 +178,28 @@ void mergeRelatedLines(vector<Vec2f> *lines, Mat &img){
     }
 }
 
+int readFlippedInteger(FILE *fp)
+{
+    int ret = 0;
 
+    BYTE *temp;
+
+    temp = (BYTE*)(&ret);
+    fread(&temp[3], sizeof(BYTE), 1, fp);
+    fread(&temp[2], sizeof(BYTE), 1, fp);
+    fread(&temp[1], sizeof(BYTE), 1, fp);
+
+    fread(&temp[0], sizeof(BYTE), 1, fp);
+
+    return ret;
+
+}
+
+inline uint_32 EndianSwap (uint_32 a)
+{
+    return (a<<24) | ((a<<8) & 0x00ff0000) |
+           ((a>>8) & 0x0000ff00) | (a>>24);
+}
 
 Mat preprocessImage(Mat img, int numRows, int numCols)
 {
@@ -242,7 +265,7 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
     }
 
     Mat cloneImg = Mat(numRows, numCols, CV_8UC1);
-    resize(newImg, cloneImg, Size(numRows, numCols), 1, 1 , INTER_LINEAR);
+    resize(newImg, cloneImg, Size(numRows, numCols), 0, 0 , INTER_NEAREST);
 
     // Now fill along the borders
     for(int i=0;i<cloneImg.rows;i++)
@@ -260,11 +283,76 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
     return cloneImg;
 }
 
+bool loadDataset(string trainPath, string labelsPath, int *numImages, int *numRows, int *numCols){
+    int n = trainPath.length();
+    char trainName[n+1];
+    strcpy(trainName, trainPath.c_str());    
+    n = labelsPath.length();
+    char labelsName[n+1];
+    strcpy(labelsName, labelsPath.c_str());
+    
+    FILE *fp = fopen(trainName, "rb");
+    FILE *fp2 = fopen(labelsName, "rb");
+
+    if(!fp || !fp2){
+        cout << "Could not open training files" <<endl;
+        return false;
+    }
+    // Read bytes in flipped order
+    /*int magicNumber = readFlippedInteger(fp);
+    *numImages = readFlippedInteger(fp);
+    *numRows = readFlippedInteger(fp);
+
+    *numCols = readFlippedInteger(fp);
+    cout << *numImages <<" " << *numRows <<" " << *numCols << endl;
+
+    fseek(fp2, 0x08, SEEK_SET);
+
+
+    if(*numImages > MAX_NUM_IMAGES) *numImages = MAX_NUM_IMAGES;
+    */
+
+
+
+
+
+    //////////////////////////////////////////////////////////////////
+    // Go through each training data entry and save a
+
+    // label for each digit
+
+    int size = (*numRows) * (*numCols);
+    Mat trainingVectors = Mat(*numImages, size, CV_32FC1);
+
+    Mat trainingClasses = Mat(*numImages, 1, CV_32FC1);
+
+    memset(trainingClasses.data, 0, sizeof(float)*(*numImages));
+
+    BYTE *tempo = new BYTE[size];
+    BYTE tempClass=0;
+    for(int i=0;i<*numImages;i++)
+    {
+
+        fread((void*)tempo, size, 1, fp);
+
+        fread((void*)(&tempClass), sizeof(BYTE), 1, fp2);
+
+        trainingClasses.data[i] = tempClass;
+
+        for(int k=0;k<size;k++)
+            trainingVectors.data[i*size+k] = tempo[k]; ///sumofsquares;
+
+    }
+
+    fclose(fp);
+
+    fclose(fp2);
+}
+
 
 int main( int argc, char* argv[] ){
 	// Read original image 
 	Mat src = imread("sudoku.jpg", IMREAD_GRAYSCALE );
-	//resize(src,src,Size(540,540),0,0,INTER_NEAREST);
 
 	//if fail to read the image
 	if (!src.data){
@@ -272,8 +360,6 @@ int main( int argc, char* argv[] ){
 		return -1;
 	}
 	
-	//Mat srcb; // Copy of original image but in grey scale
-	//cvtColor(src, srcb, COLOR_BGR2GRAY);
     Mat original = src.clone();
 	imshow("original image",src);
     
@@ -282,7 +368,6 @@ int main( int argc, char* argv[] ){
 	Mat thresholded;
 
     Mat outerBox = Mat(src.size(), CV_8UC1);
-    //Mat outerBox1 = Mat(src.size(), CV_8UC1);
 
 	GaussianBlur(src, src, Size(11, 11), 0); //removing noises
 	
@@ -293,34 +378,9 @@ int main( int argc, char* argv[] ){
     Mat kernel = (Mat_<uchar>(3,3) << 0,1,0,1,1,1,0,1,0);
     dilate(outerBox, outerBox, kernel);
     imshow("outer box", outerBox);
-
-	//adaptiveThreshold(src, outerBox1, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 5, 2);// thresholding the image
-    //imshow("smooth image", outerBox1);	
+	
 	
     /***************************** Borders *******************************/
-
-    vector<vector<Point>> contours; 
-	vector<Vec4i> hierarchy;
-	
-	//findContours(outerBox, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);//FINDING CONTOUR
-	
-	//finding the sudoku with max area which will be our main grid
-	double area; double maxarea = 0; int p;
-	/*for (int i = 0; i < contours.size(); i++){
-		area = contourArea(contours[i], false);
-		if (area > 16){
-			if (area > maxarea){
-				maxarea = area;
-				p = i;
-			}
-		}
-	}
-
-	double perimeter = arcLength(contours[p], true);
-	
-	approxPolyDP(contours[p], contours[p], 0.01*perimeter, true);
-
-	drawContours(src, contours, p, Scalar(255, 0, 0), 1, 8);*/
 
     int count=0;
     int max=-1;
@@ -347,14 +407,12 @@ int main( int argc, char* argv[] ){
         uchar *row = outerBox.ptr(y);
         for(int x=0;x<outerBox.size().width;x++){
             if(row[x]==64 && x!=maxPt.x && y!=maxPt.y){
-                int area = floodFill(outerBox, Point(x,y), CV_RGB(0,0,0));
+                floodFill(outerBox, Point(x,y), CV_RGB(0,0,0));
             }
         }
     }
     erode(outerBox, outerBox, kernel);
     imshow("borders", outerBox);
-
-	//imshow("countour image",src);
     
     /************************** Hough Lines ************************/
 
@@ -364,7 +422,7 @@ int main( int argc, char* argv[] ){
     /**************************** Merge Lines *************************/
 
     mergeRelatedLines(&lines, src);
-    for(int i=0;i<lines.size();i++){
+    for(unsigned int i=0;i<lines.size();i++){
         drawLine(lines[i], outerBox, CV_RGB(0,0,128));
     }
     
@@ -378,7 +436,7 @@ int main( int argc, char* argv[] ){
     Vec2f leftEdge = Vec2f(1000,1000);    double leftXIntercept=100000, leftYIntercept=0;
     Vec2f rightEdge = Vec2f(-1000,-1000);        double rightXIntercept=0, rightYIntercept=0;
 
-    for(int i=0;i<lines.size();i++){
+    for(unsigned int i=0;i<lines.size();i++){
         Vec2f current = lines[i];
 
         float p=current[0];
@@ -387,7 +445,8 @@ int main( int argc, char* argv[] ){
 
         if(p==0 && theta==-100)
             continue;
-        double xIntercept, yIntercept;
+        double xIntercept;
+        double yIntercept;
         xIntercept = p/cos(theta);
         yIntercept = p/(cos(theta)*sin(theta));
         if(theta>CV_PI*80/180 && theta<CV_PI*100/180){
@@ -506,114 +565,7 @@ int main( int argc, char* argv[] ){
     warpPerspective(original, undistorted, getPerspectiveTransform(source, dst), Size(maxLength, maxLength));
 
     imshow("undistorted", undistorted);
-    //waitKey(0);
-    //Point2f entry[4];
-	//Point2f out[4];
-	//double sum = 0; double prevsum = 0; int a; int b; double diff1; double diff2;  double diffprev2 = 0; double diffprev=0;double prevsum2=contours[p][0].x + contours[p][0].y;
-	
-	//int c; int d;
-    //cout << "hey" << endl;
-    /*
-	for (int i = 0; i < 4; i++){
-		sum = contours[p][i].x + contours[p][i].y;
-		diff1 = contours[p][i].x - contours[p][i].y;
-		diff2= contours[p][i].y - contours[p][i].x;
-		if (diff1 > diffprev){
-			diffprev = diff1;
-			c = i;
-		}
-		if (diff2 > diffprev2){
-			diffprev2 = diff2;
-			d= i;
-		}
 
-		if (sum > prevsum){
-			prevsum = sum; a = i;
-		}
-		
-		if (sum < prevsum2){
-		    prevsum2 = sum;
-			b = i;
-		}
-	}
-	
-	entry[0] = contours[p][a];
-	entry[1] = contours[p][b];
-	entry[2] = contours[p][c];
-	entry[3] = contours[p][d];
-
-	out[0] = Point2f(450, 450);
-	out[1] = Point2f(0, 0);
-	out[2] = Point2f(450, 0);
-	out[3] = Point(0, 450);
-
-    */
-
-	Mat wrap; Mat mat; 
-
-	/*mat = Mat::zeros(src.size(), src.type());
-	
-	wrap = getPerspectiveTransform(entry, out);
-	
-	warpPerspective(src, mat, wrap, Size(450, 450));
-
-	imshow("sudoku part",mat);
-
-	Mat ch; Mat thresholded2;
-
-	cvtColor(mat,ch,COLOR_BGR2GRAY);
-
-	GaussianBlur(ch, ch, Size(11, 11), 0, 0);
-
-	adaptiveThreshold(ch, thresholded2, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 5, 2);
-	bitwise_not(thresholded2, thresholded2);
-
-	//Mat kernel = (Mat_<uchar>(3,3) << 0,1,0,1,1,1,0,1,0);
-    //dilate(thresholded2, thresholded2, kernel,Point(-1,-1),1);
-
-	erode(thresholded2,thresholded2,2);
-
-    int p2=0;int p3=0;
-	
-    while(p3<450){
-        for(int i=p3;i<p3+10;i++){
-	        for(int j=0;j<450;j++){
-		        thresholded2.at<uchar>(j,i)=0;
-	        }
-        }
-        p3=p3+50;
-    }
-
-    while(p2<450){
-        for( int i=0;i<450;i++){
-	        for(int j=p2;j<p2+10;j++){
-		        thresholded2.at<uchar>(j,i)=0;
-	        }
-        }
-        p2=p2+50;
-    }
-
-    for(int i=440;i<450;i++){
-	    for(int j=0;j<450;j++){
-		    thresholded2.at<uchar>(j,i)=0;
-	    }
-    }
-
-    for(int i=0;i<450;i++){
-	for(int j=440;j<450;j++){
-		thresholded2.at<uchar>(j,i)=0;
-	    }
-    }
-
-    for(int i=0;i<450;i++){
-	    for(int j=150;j<160;j++){
-		    thresholded2.at<uchar>(j,i)=0;
-	    }
-
-    }
-
-	imshow("thresholded new",thresholded2);
-	*/
 
     /******************************* Number Classification *************************/
 
@@ -622,186 +574,50 @@ int main( int argc, char* argv[] ){
     imshow("new threshold", undistortedThreshed);
     //waitKey(0);
 
-    /*DigitRecognizer *dr = new DigitRecognizer();
-    bool b = dr->train("test_train/train-images.idx3-ubyte", "test_train/train-labels.idx1-ubyte");
-    if(!b)
-        cout << "NOT TRAINING" << endl;
-    */
-
-    int num = 797;
-    int size = 16 * 16;
-    Mat trainData = Mat(Size(size, num), CV_32FC1);
-    Mat responces = Mat(Size(1, num), CV_32FC1);
-
-    int counter = 0;
-    for(int i=0;i<=9;i++){		
-    	DIR *dir;
-    	struct dirent *ent;
-    	char pathToImages[]="./digits3";
-    	char path[255];
-    	sprintf(path, "%s/%d", pathToImages, i);
-    	if ((dir = opendir(path)) != NULL){		
-	        while ((ent = readdir (dir)) != NULL){ 
-	            if (strcmp(ent->d_name, ".") != 0 && strcmp(ent->d_name, "..") != 0 ){
-	                char text[255];
-	                sprintf(text,"/%s",ent->d_name);
-	                string digit(text);
-	                digit=path+digit; 
-
-					Mat mat=imread(digit,1);
-				
-					cvtColor(mat,mat,COLOR_BGR2GRAY);
-
-					threshold(mat , mat , 200, 255 ,THRESH_OTSU);					
-
-					mat.convertTo(mat,CV_32FC1,1.0/255.0);
-
-					resize(mat, mat, Size(16,16 ),0,0,INTER_NEAREST);
-					
-					mat.reshape(1,1);
-
-
-	                for (int k=0; k<size; k++){
-	                    trainData.at<float>(counter*size+k) = mat.at<float>(k);
-	                }
-	                responces.at<float>(counter) = i;
-	                counter++;
-	        	}
-	         
-	        }
-        	
-        }
-        closedir(dir);
-    }
-    
-
     Ptr<KNearest> knn;
     knn = KNearest::create();
 
-    knn->train(trainData,ROW_SAMPLE,responces);
- 
+    string trainPath = "test_train/train-images.idx3-ubyte";
+    string labelsPath = "test_train/train-labels.idx1-ubyte";
+
     
+    
+    knn->train(trainingVectors, ml::ROW_SAMPLE,trainingClasses);
+    if(knn->isTrained())
+        std::cout << "training succ" << std::endl;
+
+
     int dist = ceil((double)maxLength/9);
     Mat currentCell = Mat(dist, dist, CV_8UC1);
+
     for(int j=0;j<9;j++){
         for(int i=0;i<9;i++){
             for(int y=0;y<dist && j*dist+y<undistortedThreshed.cols;y++){
+
                 uchar* ptr = currentCell.ptr(y);
+
                 for(int x=0;x<dist && i*dist+x<undistortedThreshed.rows;x++){
-                    ptr[x] = undistortedThreshed.at<uchar>(j*dist+y, i*dist+x);
+                ptr[x] = undistortedThreshed.at<uchar>(j*dist+y, i*dist+x);
                 }
             }
             Moments m = cv::moments(currentCell, true);
             int area = m.m00;
-            //imshow("current cell", currentCell);
-            Mat cellClone = currentCell.clone();
-            if(area > cellClone.rows*cellClone.cols/5){
-                cellClone = preprocessImage(cellClone, 16, 16);
-                cellClone.convertTo(cellClone, CV_32FC1, 1.0/255.0);             
-                waitKey(0); 
-		        Mat response, dist;
-                resize(cellClone, cellClone, Size(16,16 ),0,0,INTER_NEAREST);		
-			    float p=knn->findNearest(cellClone.reshape(1,1),1, noArray(), response, dist);
-                cout << "P: " << p << endl;
-                //cout << p <<" "; 
+            if(area > currentCell.rows*currentCell.cols/5){
+                Mat cloneImg = preprocessImage(currentCell, numRows, numCols);
+                imshow("after process" , cloneImg);
+                waitKey(0);
+                Mat response, dist;
+                float number = knn->findNearest(Mat_<float>(cloneImg), 1, response, noArray(), noArray());
+                cout << "P : " << number << endl;
             }
             else{
-                //cout <<" ";
+                printf("  ");
             }
         }
-        //cout << " " << endl; 
+        printf(" ");
     }
-    cout << endl;
 
-    //vector <Mat> small; vector <Mat> smallt;
-	
- 
-    /*int m = 0, n = 0; Mat smallimage; Mat smallimage2;
-	for (; m < 450; m = m + 50){
-		for (n = 0; n < 450; n = n + 50){ 
-			smallimage = Mat(undistortedThreshed, cv::Rect(n, m, 50, 50));
-					
-			smallt.push_back(smallimage);
-		}
-	}
     
-    int z[9][9];
-	for(size_t i=0;i<smallt.size();i++){
-		Mat img123 =Mat(Size(size, 1), CV_32FC1);
-		if(countNonZero(smallt[i])>200){
-		
-			Mat thresholded3; Mat regionOfInterest; Mat img12;
-		
-			thresholded3=smallt[i].clone();
-
-			vector < vector <Point> >contours2;
-			
-			findContours(thresholded3, contours2, RETR_LIST, CHAIN_APPROX_SIMPLE);
-
-			Rect prevb; double areaprev = 0; double area2; int q;
-
-			for (int j = 0; j < contours2.size(); j++){
-				Rect bnd = boundingRect(contours2[j]);
-					    
-				area2 = bnd.height*bnd.width;
-				
-				if (area2 > areaprev){
-					prevb = bnd;
-					areaprev = area2;
-				    q = j;
-				}
-			}
-			
-            Rect rec = prevb;
-	
-			regionOfInterest = smallt[i](rec);
-
-			resize(regionOfInterest, img12, Size(16,16),0,0,INTER_NEAREST);
-
-			img12.convertTo(img12,CV_32FC1,1.0/255.0);                 
-			img12.reshape(1,1);   
-
-			Mat output;
-			if(countNonZero(img12)>50){
-				imshow("display",img12);
-				waitKey(0);			
-			    for(int k=0;k<size;k++){
-				    img123.at<float>(k) = img12.at<float>(k);
-			    }
-	            		
-		        Mat response, dist;		
-			    float p=knn->findNearest(img123.reshape(1,1),1, noArray(), response, dist);
-			
-			    z[i/9][i%9]=p;
-			}
-		    else
-                z[i/9][i%9]=0;
-		}
-		else z[i/9][i%9]=0;
-    }
-    
-	for(int i=0;i<9;i++){
-		for(int j=0;j<9;j++){
-			//cout << z[i][j]<<" ";
-		}
-		cout<<endl;
-	}
-
-		
-	int grid[N][N];
-
-	for(int i=0;i<9;i++){
-		for(int j=0;j<9;j++){
-			//grid[i][j]=z[i][j];
-		}
-	}
-
-	if (SolveSudoku(grid) == true)
-		printGrid(grid);
-	else	
-		cout << "please correct" << endl;
-		
-    */
 	waitKey(0);
 	return 0;
 }
