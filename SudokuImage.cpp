@@ -11,7 +11,6 @@ using namespace std;
 using namespace ml;
 
 #include <stdio.h>
-#include <stdint.h>
 
 // UNASSIGNED is used for empty cells in sudoku
 #define UNASSIGNED 0
@@ -195,12 +194,6 @@ int readFlippedInteger(FILE *fp)
 
 }
 
-inline uint32_t EndianSwap (uint32_t a)
-{
-    return (a<<24) | ((a<<8) & 0x00ff0000) |
-           ((a>>8) & 0x0000ff00) | (a>>24);
-}
-
 Mat preprocessImage(Mat img, int numRows, int numCols)
 {
 
@@ -263,10 +256,11 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
             ptr[x] = img.at<uchar>(rowTop+(y-startAtY),colLeft+(x-startAtX));
         }
     }
-
     Mat cloneImg = Mat(numRows, numCols, CV_8UC1);
     resize(newImg, cloneImg, Size(numRows, numCols), 0, 0 , INTER_NEAREST);
-
+    //cout <<  numRows <<" " << numCols << endl;
+    imshow("clone ", cloneImg);
+    waitKey(0);
     // Now fill along the borders
     for(int i=0;i<cloneImg.rows;i++)
     {
@@ -277,13 +271,21 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
         floodFill(cloneImg, Point(i, 0), Scalar(0));
         floodFill(cloneImg, Point(i, cloneImg.rows-1), Scalar(0));
     }
+    cloneImg.convertTo(cloneImg, CV_32FC1, 1.0/255.0 );
     imshow("clone img", cloneImg);
+    cout << "number = " << endl << " " << cloneImg << endl << endl;
     waitKey(0);
     cloneImg = cloneImg.reshape(1,1);
     return cloneImg;
 }
 
-bool loadDataset(string trainPath, string labelsPath, int *numImages, int *numRows, int *numCols){
+inline uint32_t EndianSwap (uint32_t a)
+{
+    return (a<<24) | ((a<<8) & 0x00ff0000) |
+           ((a>>8) & 0x0000ff00) | (a>>24);
+}
+
+bool loadDataset(string trainPath, string labelsPath, int &numRows, int &numCols, int &numImages, Mat &trainingVectors, Mat &trainingClasses){
     int n = trainPath.length();
     char trainName[n+1];
     strcpy(trainName, trainPath.c_str());    
@@ -298,41 +300,38 @@ bool loadDataset(string trainPath, string labelsPath, int *numImages, int *numRo
         cout << "Could not open training files" <<endl;
         return false;
     }
-    // Read bytes in flipped order
-    /*int magicNumber = readFlippedInteger(fp);
-    *numImages = readFlippedInteger(fp);
-    *numRows = readFlippedInteger(fp);
+    
 
-    *numCols = readFlippedInteger(fp);
-    cout << *numImages <<" " << *numRows <<" " << *numCols << endl;
+    //Read images
+    // Read bytes in flipped order
+    int magicNumber = readFlippedInteger(fp);
+    numImages = readFlippedInteger(fp);
+    numRows = readFlippedInteger(fp);
+
+    numCols = readFlippedInteger(fp);
+    cout << numImages <<" " << numRows <<" " << numCols << endl;
 
     fseek(fp2, 0x08, SEEK_SET);
+    fseek(fp, 0x16, SEEK_SET);
 
 
-    if(*numImages > MAX_NUM_IMAGES) *numImages = MAX_NUM_IMAGES;
-    */
-
-
-
-
-
+    if(numImages > MAX_NUM_IMAGES) numImages = MAX_NUM_IMAGES;
+    
     //////////////////////////////////////////////////////////////////
     // Go through each training data entry and save a
 
     // label for each digit
 
-    int size = (*numRows) * (*numCols);
-    Mat trainingVectors = Mat(*numImages, size, CV_32FC1);
+    int size = (numRows) * (numCols);
+    trainingVectors = Mat(numImages, size, CV_8UC1);
 
-    Mat trainingClasses = Mat(*numImages, 1, CV_32FC1);
+    trainingClasses = Mat(numImages, 1, CV_8UC1);
 
-    memset(trainingClasses.data, 0, sizeof(float)*(*numImages));
+    memset(trainingClasses.data, 0, sizeof(uchar)*(numImages));
 
-    BYTE *tempo = new BYTE[size];
+    BYTE tempo[size];
     BYTE tempClass=0;
-    for(int i=0;i<*numImages;i++)
-    {
-
+    for(int i=0;i<numImages;i++){
         fread((void*)tempo, size, 1, fp);
 
         fread((void*)(&tempClass), sizeof(BYTE), 1, fp2);
@@ -340,13 +339,55 @@ bool loadDataset(string trainPath, string labelsPath, int *numImages, int *numRo
         trainingClasses.data[i] = tempClass;
 
         for(int k=0;k<size;k++)
-            trainingVectors.data[i*size+k] = tempo[k]; ///sumofsquares;
-
+            trainingVectors.at<uchar>(i*size+k) = tempo[k]; ///sumofsquares;
+        if(trainingVectors.empty())
+            cout << "Empty" << endl; 
     }
+    //cout << "M = " << endl << " " << trainingClasses << endl << endl;
+    return true;
+}
 
-    fclose(fp);
-
-    fclose(fp2);
+bool loadDigitsDataset(Mat &trainData, Mat &responces){
+    int num = 797;
+    int size = 16 * 16;
+    trainData = Mat(Size(size, num), CV_32FC1);
+    responces = Mat(Size(1, num), CV_32FC1);
+    int counter = 0;
+    for(int i=0;i<=9;i++){
+        // reading the images from the folder of tarining samples
+        DIR *dir;
+        struct dirent *ent;
+        char pathToImages[]="./digits3"; // name of the folder containing images
+        char path[255];
+        sprintf(path, "%s/%d", pathToImages, i);
+        if ((dir = opendir(path)) != NULL){
+            while ((ent = readdir (dir)) != NULL){
+                if (strcmp(ent->d_name, ".") != 0 && strcmp(ent->d_name, "..") != 0 ){
+                    char text[255];
+                    sprintf(text,"/%s",ent->d_name);
+                    string digit(text);
+                    digit=path+digit;
+                    Mat mat=imread(digit,1); //loading the image
+                    cvtColor(mat,mat, COLOR_RGB2GRAY);  //converting into grayscale
+                    threshold(mat , mat , 200, 255 ,THRESH_OTSU); // preprocessing
+                    mat.convertTo(mat,CV_32FC1,1.0/255.0); //necessary to convert images to CV_32FC1 for using K nearest neighbour algorithm
+                    resize(mat, mat, Size(16,16 ),0,0,INTER_NEAREST); // same size as our testing samples
+                    //imshow("mat", mat);
+                    //waitKey(0);
+                    //cout << "M = " << endl << " " << mat << endl << endl;
+                    mat.reshape(1,1);
+                    for (int k=0; k<size;k++) { 
+                        trainData.at<float>(counter*size+k) = mat.at<float>(k); // storing the pixels of the image
+                    }
+                    
+                    responces.at<float>(counter) = i; // stroing the responce corresponding to image
+                    counter++;
+                }
+            }
+        }
+        closedir(dir);
+    }
+    return true;
 }
 
 
@@ -573,6 +614,7 @@ int main( int argc, char* argv[] ){
     adaptiveThreshold(undistorted, undistortedThreshed, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV, 101, 1);
     imshow("new threshold", undistortedThreshed);
     //waitKey(0);
+    //cout << "M = " << endl << " " << undistortedThreshed << endl << endl;
 
     Ptr<KNearest> knn;
     knn = KNearest::create();
@@ -580,16 +622,24 @@ int main( int argc, char* argv[] ){
     string trainPath = "test_train/train-images.idx3-ubyte";
     string labelsPath = "test_train/train-labels.idx1-ubyte";
 
-    
-    
+    //int numRows, numCols, numImages;
+    Mat trainingVectors, trainingClasses;
+
+    //loadDataset(trainPath, labelsPath, numRows, numCols, numImages, trainingVectors, trainingClasses  );
+    loadDigitsDataset(trainingVectors, trainingClasses);
+    //trainingVectors.convertTo(trainingVectors, CV_32FC1, 1.0/255.0);
+    //trainingClasses.convertTo(trainingClasses, CV_32FC1);
+    //cout << "M = " << endl << " " << trainingVectors << endl << endl;
     knn->train(trainingVectors, ml::ROW_SAMPLE,trainingClasses);
+
     if(knn->isTrained())
         std::cout << "training succ" << std::endl;
 
 
+
     int dist = ceil((double)maxLength/9);
     Mat currentCell = Mat(dist, dist, CV_8UC1);
-
+    //cout << "UT = " << endl << " " << undistortedThreshed << endl << endl;
     for(int j=0;j<9;j++){
         for(int i=0;i<9;i++){
             for(int y=0;y<dist && j*dist+y<undistortedThreshed.cols;y++){
@@ -597,24 +647,28 @@ int main( int argc, char* argv[] ){
                 uchar* ptr = currentCell.ptr(y);
 
                 for(int x=0;x<dist && i*dist+x<undistortedThreshed.rows;x++){
-                ptr[x] = undistortedThreshed.at<uchar>(j*dist+y, i*dist+x);
+                    ptr[x] = undistortedThreshed.at<uchar>(j*dist+y, i*dist+x);
                 }
             }
             Moments m = cv::moments(currentCell, true);
             int area = m.m00;
-            if(area > currentCell.rows*currentCell.cols/5){
-                Mat cloneImg = preprocessImage(currentCell, numRows, numCols);
+            //cout << area << endl;
+            imshow("currentCell" , currentCell);
+            waitKey(0);
+            if(area > currentCell.rows*currentCell.cols/4){
+                Mat cloneImg = preprocessImage(currentCell, 16, 16);
                 imshow("after process" , cloneImg);
+                Mat response;
+                float number = knn->findNearest(cloneImg, 1, response, noArray(), noArray());
+                cout << "M = " << endl << " " << response << endl << endl;
                 waitKey(0);
-                Mat response, dist;
-                float number = knn->findNearest(Mat_<float>(cloneImg), 1, response, noArray(), noArray());
-                cout << "P : " << number << endl;
+                cout << int(number) <<" ";
             }
             else{
-                printf("  ");
+                cout <<"0 ";
             }
         }
-        printf(" ");
+        cout << endl;
     }
 
     
