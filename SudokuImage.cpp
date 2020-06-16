@@ -20,90 +20,6 @@ using namespace ml;
 
 typedef unsigned char BYTE;
 
-bool FindUnassignedLocation(int grid[N][N], int &row, int &col);
-
-// Checks whether it will be legal to assign num to the given row,col
-bool isSafe(int grid[N][N], int row, int col, int num);
-
-//method for solving
-bool SolveSudoku(int grid[N][N]){
-	int row, col;
-
-	// If there is no unassigned location,sudoku is solved
-	if (!FindUnassignedLocation(grid, row, col))
-	    return true;
-    //std::cout << "solving .. " << std::endl;
-	// numbers 1 to 9 will be tested
-	for (int num = 1; num <= 9; num++){
-
-		if (isSafe(grid, row, col, num)){
-			 // make first possible legal  assignment
-			grid[row][col] = num;
-
-			if (SolveSudoku(grid))
-				return true;
-
-			grid[row][col] = UNASSIGNED;
-		}
-	}
-	return false; // // this triggers backtracking.If no number satisfies the square this means we went wrong and it starts going back.
-    // Though a genuine problem is if some num is wrong somewhere it starts filling the peviously filled square bby starting off with 1 again.Think!!!
-}
-
-
-
-bool FindUnassignedLocation(int grid[N][N], int &row, int &col){
-	for (row = 0; row < N; row++)
-		for (col = 0; col < N; col++)
-			if (grid[row][col] == UNASSIGNED)
-				return true;
-	return false;
-}
-
-//checks whether the entry is in some row or column
-bool UsedInRow(int grid[N][N], int row, int num){
-	for (int col = 0; col < N; col++)
-		if (grid[row][col] == num)
-			return true;
-	return false;
-}
-
-
-bool UsedInCol(int grid[N][N], int col, int num){
-	for (int row = 0; row < N; row++)
-		if (grid[row][col] == num)
-			return true;
-	return false;
-}
-
-
-bool UsedInBox(int grid[N][N], int boxStartRow, int boxStartCol, int num){
-	for (int row = 0; row < 3; row++)
-		for (int col = 0; col < 3; col++)
-			if (grid[row+boxStartRow][col+boxStartCol] == num)
-				return true;
-	return false;
-}
-// whether it will be legal to assign num
-
-bool isSafe(int grid[N][N], int row, int col, int num){
-	/* Check if 'num' is not already placed in current row,
-	current column and current 3x3 box */
-	return !UsedInRow(grid, row, num) &&
-		!UsedInCol(grid, col, num) &&
-		!UsedInBox(grid, row - row%3 , col - col%3, num);
-}
-
-
-void printGrid(int grid[N][N]){
-	for (int row = 0; row < N; row++){
-	    for (int col = 0; col < N; col++)
-			printf("%2d", grid[row][col]);
-		printf("\n");
-	}
-}
-
-
 void drawLine(Vec2f line, Mat &img, Scalar rgb = CV_RGB(0,0,255)){
     if(line[1]!=0){
         float m = -1/tan(line[1]);
@@ -279,11 +195,6 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
     return cloneImg;
 }
 
-inline uint32_t EndianSwap (uint32_t a)
-{
-    return (a<<24) | ((a<<8) & 0x00ff0000) |
-           ((a>>8) & 0x0000ff00) | (a>>24);
-}
 
 bool loadDataset(string trainPath, string labelsPath, int &numRows, int &numCols, int &numImages, Mat &trainingVectors, Mat &trainingClasses){
     int n = trainPath.length();
@@ -347,49 +258,6 @@ bool loadDataset(string trainPath, string labelsPath, int &numRows, int &numCols
     return true;
 }
 
-bool loadDigitsDataset(Mat &trainData, Mat &responces){
-    int num = 797;
-    int size = 16 * 16;
-    trainData = Mat(Size(size, num), CV_32FC1);
-    responces = Mat(Size(1, num), CV_32FC1);
-    int counter = 0;
-    for(int i=0;i<=9;i++){
-        // reading the images from the folder of tarining samples
-        DIR *dir;
-        struct dirent *ent;
-        char pathToImages[]="./digits3"; // name of the folder containing images
-        char path[255];
-        sprintf(path, "%s/%d", pathToImages, i);
-        if ((dir = opendir(path)) != NULL){
-            while ((ent = readdir (dir)) != NULL){
-                if (strcmp(ent->d_name, ".") != 0 && strcmp(ent->d_name, "..") != 0 ){
-                    char text[255];
-                    sprintf(text,"/%s",ent->d_name);
-                    string digit(text);
-                    digit=path+digit;
-                    Mat mat=imread(digit,1); //loading the image
-                    cvtColor(mat,mat, COLOR_RGB2GRAY);  //converting into grayscale
-                    threshold(mat , mat , 200, 255 ,THRESH_OTSU); // preprocessing
-                    mat.convertTo(mat,CV_32FC1,1.0/255.0); //necessary to convert images to CV_32FC1 for using K nearest neighbour algorithm
-                    resize(mat, mat, Size(16,16 ),0,0,INTER_NEAREST); // same size as our testing samples
-                    //imshow("mat", mat);
-                    //waitKey(0);
-                    //cout << "M = " << endl << " " << mat << endl << endl;
-                    mat.reshape(1,1);
-                    for (int k=0; k<size;k++) { 
-                        trainData.at<float>(counter*size+k) = mat.at<float>(k); // storing the pixels of the image
-                    }
-                    
-                    responces.at<float>(counter) = i; // stroing the responce corresponding to image
-                    counter++;
-                }
-            }
-        }
-        closedir(dir);
-    }
-    return true;
-}
-
 
 int main( int argc, char* argv[] ){
 	// Read original image 
@@ -398,7 +266,7 @@ int main( int argc, char* argv[] ){
 	//if fail to read the image
 	if (!src.data){
 		cout << "Error loading the image" << endl;
-		return -1;
+		return -12;
 	}
 	
     Mat original = src.clone();
@@ -622,13 +490,12 @@ int main( int argc, char* argv[] ){
     string trainPath = "test_train/train-images.idx3-ubyte";
     string labelsPath = "test_train/train-labels.idx1-ubyte";
 
-    //int numRows, numCols, numImages;
+    int numRows, numCols, numImages;
     Mat trainingVectors, trainingClasses;
 
-    //loadDataset(trainPath, labelsPath, numRows, numCols, numImages, trainingVectors, trainingClasses  );
-    loadDigitsDataset(trainingVectors, trainingClasses);
-    //trainingVectors.convertTo(trainingVectors, CV_32FC1, 1.0/255.0);
-    //trainingClasses.convertTo(trainingClasses, CV_32FC1);
+    loadDataset(trainPath, labelsPath, numRows, numCols, numImages, trainingVectors, trainingClasses  );
+    trainingVectors.convertTo(trainingVectors, CV_32FC1, 1.0/255.0);
+    trainingClasses.convertTo(trainingClasses, CV_32FC1);
     //cout << "M = " << endl << " " << trainingVectors << endl << endl;
     knn->train(trainingVectors, ml::ROW_SAMPLE,trainingClasses);
 
@@ -656,7 +523,7 @@ int main( int argc, char* argv[] ){
             imshow("currentCell" , currentCell);
             waitKey(0);
             if(area > currentCell.rows*currentCell.cols/4){
-                Mat cloneImg = preprocessImage(currentCell, 16, 16);
+                Mat cloneImg = preprocessImage(currentCell, numRows, numCols);
                 imshow("after process" , cloneImg);
                 Mat response;
                 float number = knn->findNearest(cloneImg, 1, response, noArray(), noArray());
