@@ -4,7 +4,8 @@
 #include "digitrecognizer.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include "iostream"
+#include <iostream>
+#include <fstream>
 #include <dirent.h>
 using namespace cv;
 using namespace std;
@@ -19,6 +20,22 @@ using namespace ml;
 #define N 9
 
 typedef unsigned char BYTE;
+
+
+/*HOGDescriptor hog(
+        Size(20,20), //winSize
+        Size(10,10), //blocksize
+        Size(5,5), //blockStride,
+        Size(10,10), //cellSize,
+                 9, //nbins,
+                  1, //derivAper,
+                 -1, //winSigma,
+                  0, //histogramNormType,
+                0.2, //L2HysThresh,
+                  1,//gammal correction,
+                  64,//nlevels=64
+                  1);//Use signed gradients
+*/
 
 void drawLine(Vec2f line, Mat &img, Scalar rgb = CV_RGB(0,0,255)){
     if(line[1]!=0){
@@ -175,8 +192,8 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
     Mat cloneImg = Mat(numRows, numCols, CV_8UC1);
     resize(newImg, cloneImg, Size(numRows, numCols), 0, 0 , INTER_NEAREST);
     //cout <<  numRows <<" " << numCols << endl;
-    imshow("clone ", cloneImg);
-    waitKey(0);
+    //imshow("clone ", cloneImg);
+    //waitKey(0);
     // Now fill along the borders
     for(int i=0;i<cloneImg.rows;i++)
     {
@@ -193,6 +210,77 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
     waitKey(0);
     cloneImg = cloneImg.reshape(1,1);
     return cloneImg;
+}
+
+int reverseInt(int i) {
+    unsigned char c1, c2, c3, c4;
+    c1 = i & 255;
+    c2 = (i >> 8) & 255;
+    c3 = (i >> 16) & 255;
+    c4 = (i >> 24) & 255;
+    return ((int)c1 << 24) + ((int)c2 << 16) + ((int)c3 << 8) + c4;
+}
+
+bool loadMNIST(string trainPath, string labelsPath, int &numRows, int &numCols, int &numImages, Mat &trainingVectors, Mat &trainingClasses){
+    int n = trainPath.length();
+    char trainName[n+1];
+    strcpy(trainName, trainPath.c_str());    
+    n = labelsPath.length();
+    char labelsName[n+1];
+    strcpy(labelsName, labelsPath.c_str());
+
+    ifstream file (trainName, ios::binary);
+    if(file.is_open()){
+        int magic_number=0;int r; int c;
+        Size size;unsigned char temp=0;
+
+        file.read((char*)&magic_number,sizeof(magic_number)); 
+        magic_number= reverseInt(magic_number);
+
+        file.read((char*)&numImages,sizeof(numImages));
+        numImages= reverseInt(numImages);
+        
+        file.read((char*)&numRows,sizeof(numRows));
+        numRows= reverseInt(numRows); 
+        file.read((char*)&numCols,sizeof(numCols));
+        numCols= reverseInt(numCols);
+        printf("%d %d %d\n", numImages, numRows, numCols);
+        trainingVectors = Mat(numImages, numRows*numCols, CV_8UC1);
+        unsigned char arr[28][28];
+        for(int i=0;i<numImages;i++){
+            for(r=0;r<numRows;r++){
+                for(c=0;c<numCols;c++){                 
+                    file.read((char*)&temp,sizeof(temp));
+                    arr[r][c]= temp;
+                    trainingVectors.at<uchar>(i ,r*numCols+c) = arr[r][c];
+                    //printf("%1.1f ", (float)temp/255.0);
+                }          
+                printf("\n"); 
+            }
+            size.height=r;size.width=c;
+            printf("\n");
+            for(r=0;r<numRows;r++){
+                printf("%d\n", i);
+                for(c=0;c<numCols; c++){
+                    //printf("%1.1f ", (float)arr[r][c]/255.0);
+                    trainingVectors.at<uchar>(i ,r*numCols+c) = arr[r][c];
+                    //printf("%1.1f ", (float)trainingVectors.at<uchar>(i,r*numCols+c)/255.0 );
+                }
+                //printf("\n");
+            }
+            //printf("\n");
+        }
+    }
+
+    for(int i=0;i<numImages;i++){
+        for(int c=0;c<784;c++){
+            printf("%1.1f ", (float)trainingVectors.at<uchar>(i,c)/255.0 );
+            if((c+1) % 28 == 0) putchar('\n');
+
+        }
+        printf("\n");
+    }
+
 }
 
 
@@ -243,20 +331,46 @@ bool loadDataset(string trainPath, string labelsPath, int &numRows, int &numCols
     BYTE tempo[size];
     BYTE tempClass=0;
     for(int i=0;i<numImages;i++){
-        fread((void*)tempo, size, 1, fp);
+        fread((void*)tempo, sizeof(BYTE), size, fp);
 
         fread((void*)(&tempClass), sizeof(BYTE), 1, fp2);
+        
 
         trainingClasses.data[i] = tempClass;
-
-        for(int k=0;k<size;k++)
-            trainingVectors.at<uchar>(i*size+k) = tempo[k]; ///sumofsquares;
+        //read(fp, (void *)tempo, 784*sizeof(BYTE));
+        for(int k=0;k<size;k++){
+            trainingVectors.at<BYTE>(i*size+k) = tempo[k]; ///sumofsquares;
+            if(i==0){
+                printf("%1.1f ", (float)tempo[k]);
+		        if ((k+1) % 28 == 0) putchar('\n');
+            }
+        }
         if(trainingVectors.empty())
             cout << "Empty" << endl; 
     }
     //cout << "M = " << endl << " " << trainingClasses << endl << endl;
     return true;
 }
+/*
+Mat deskew(Mat& img)
+{
+    Moments m = moments(img);
+    if(abs(m.mu02) < 1e-2)
+    {
+        // No deskewing needed. 
+        return img.clone();
+    }
+    // Calculate skew based on central momemts. 
+    double skew = m.mu11/m.mu02;
+    // Calculate affine transform to correct skewness. 
+    Mat warpMat = (Mat_<double>(2,3) << 1, skew, -0.5*SZ*skew, 0, 1 , 0);
+
+    Mat imgOut = Mat::zeros(img.rows, img.cols, img.type());
+    warpAffine(img, imgOut, warpMat, imgOut.size(),affineFlags);
+
+    return imgOut;
+}*/
+
 
 
 int main( int argc, char* argv[] ){
@@ -271,6 +385,7 @@ int main( int argc, char* argv[] ){
 	
     Mat original = src.clone();
 	imshow("original image",src);
+    //waitKey();
     
     /**************************** Thresholding ****************************/ 
 
@@ -286,7 +401,7 @@ int main( int argc, char* argv[] ){
 
     Mat kernel = (Mat_<uchar>(3,3) << 0,1,0,1,1,1,0,1,0);
     dilate(outerBox, outerBox, kernel);
-    imshow("outer box", outerBox);
+    //imshow("outer box", outerBox);
 	
 	
     /***************************** Borders *******************************/
@@ -321,7 +436,7 @@ int main( int argc, char* argv[] ){
         }
     }
     erode(outerBox, outerBox, kernel);
-    imshow("borders", outerBox);
+    //imshow("borders", outerBox);
     
     /************************** Hough Lines ************************/
 
@@ -335,7 +450,7 @@ int main( int argc, char* argv[] ){
         drawLine(lines[i], outerBox, CV_RGB(0,0,128));
     }
     
-    imshow("HoughLines merged", outerBox);        
+    //imshow("HoughLines merged", outerBox);        
 
     /****************************** Extreme Lines ***************************/
    
@@ -473,7 +588,7 @@ int main( int argc, char* argv[] ){
     
     warpPerspective(original, undistorted, getPerspectiveTransform(source, dst), Size(maxLength, maxLength));
 
-    imshow("undistorted", undistorted);
+    //imshow("undistorted", undistorted);
 
 
     /******************************* Number Classification *************************/
@@ -493,12 +608,19 @@ int main( int argc, char* argv[] ){
     int numRows, numCols, numImages;
     Mat trainingVectors, trainingClasses;
 
-    loadDataset(trainPath, labelsPath, numRows, numCols, numImages, trainingVectors, trainingClasses  );
+    loadMNIST(trainPath, labelsPath, numRows, numCols, numImages, trainingVectors, trainingClasses  );
+    
+    
+    Mat testImg; 
+
+    //resize(trainingVectors, testImg, Size(1200,1000), 0, 0 , INTER_NEAREST);
+    //imshow("test", testImg);
+    //waitKey(); 
     trainingVectors.convertTo(trainingVectors, CV_32FC1, 1.0/255.0);
     trainingClasses.convertTo(trainingClasses, CV_32FC1);
     //cout << "M = " << endl << " " << trainingVectors << endl << endl;
+    
     knn->train(trainingVectors, ml::ROW_SAMPLE,trainingClasses);
-
     if(knn->isTrained())
         std::cout << "training succ" << std::endl;
 
@@ -521,14 +643,15 @@ int main( int argc, char* argv[] ){
             int area = m.m00;
             //cout << area << endl;
             imshow("currentCell" , currentCell);
+           
             waitKey(0);
             if(area > currentCell.rows*currentCell.cols/4){
                 Mat cloneImg = preprocessImage(currentCell, numRows, numCols);
-                imshow("after process" , cloneImg);
+                //imshow("after process" , cloneImg);
                 Mat response;
                 float number = knn->findNearest(cloneImg, 1, response, noArray(), noArray());
                 cout << "M = " << endl << " " << response << endl << endl;
-                waitKey(0);
+                //waitKey(0);
                 cout << int(number) <<" ";
             }
             else{
@@ -539,7 +662,7 @@ int main( int argc, char* argv[] ){
     }
 
     
-	waitKey(0);
+	//waitKey();
 	return 0;
 }
 		
