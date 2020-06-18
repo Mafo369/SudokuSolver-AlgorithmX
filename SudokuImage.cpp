@@ -191,9 +191,6 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
     }
     Mat cloneImg = Mat(numRows, numCols, CV_8UC1);
     resize(newImg, cloneImg, Size(numRows, numCols), 0, 0 , INTER_NEAREST);
-    //cout <<  numRows <<" " << numCols << endl;
-    //imshow("clone ", cloneImg);
-    //waitKey(0);
     // Now fill along the borders
     for(int i=0;i<cloneImg.rows;i++)
     {
@@ -206,7 +203,6 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
     }
     cloneImg.convertTo(cloneImg, CV_32FC1, 1.0/255.0 );
     imshow("clone img", cloneImg);
-    cout << "number = " << endl << " " << cloneImg << endl << endl;
     waitKey(0);
     cloneImg = cloneImg.reshape(1,1);
     return cloneImg;
@@ -253,34 +249,44 @@ bool loadMNIST(string trainPath, string labelsPath, int &numRows, int &numCols, 
                     file.read((char*)&temp,sizeof(temp));
                     arr[r][c]= temp;
                     trainingVectors.at<uchar>(i ,r*numCols+c) = arr[r][c];
-                    //printf("%1.1f ", (float)temp/255.0);
+                    //printf("%1.1f ", (float)trainingVectors.at<uchar>(i,r*numCols+c)/255.0 );
                 }          
-                printf("\n"); 
+                //printf("\n"); 
             }
             size.height=r;size.width=c;
-            printf("\n");
-            for(r=0;r<numRows;r++){
-                printf("%d\n", i);
-                for(c=0;c<numCols; c++){
-                    //printf("%1.1f ", (float)arr[r][c]/255.0);
-                    trainingVectors.at<uchar>(i ,r*numCols+c) = arr[r][c];
-                    //printf("%1.1f ", (float)trainingVectors.at<uchar>(i,r*numCols+c)/255.0 );
-                }
-                //printf("\n");
-            }
             //printf("\n");
         }
     }
 
-    for(int i=0;i<numImages;i++){
+    ifstream fileLabels (labelsName, ios::binary);
+    if(fileLabels.is_open()){
+        int magic_number=0;int r; int c;
+        Size size;unsigned char temp=0;
+
+        fileLabels.read((char*)&magic_number,sizeof(magic_number)); 
+        magic_number= reverseInt(magic_number);
+
+        fileLabels.read((char*)&numImages,sizeof(numImages));
+        numImages= reverseInt(numImages);
+        
+        //printf("%d\n", numImages);
+        trainingClasses = Mat(numImages, 1, CV_8UC1);
+        for(int i=0;i<numImages;i++){
+            fileLabels.read((char*)&temp,sizeof(temp));
+            trainingClasses.at<uchar>(1, i) = temp;
+            //printf("%d\n", trainingClasses.at<uchar>(1,i));
+        }
+    }
+
+    /*for(int i=0;i<numImages;i++){
         for(int c=0;c<784;c++){
             printf("%1.1f ", (float)trainingVectors.at<uchar>(i,c)/255.0 );
             if((c+1) % 28 == 0) putchar('\n');
 
         }
         printf("\n");
-    }
-
+    }*/
+    return true;
 }
 
 
@@ -610,25 +616,23 @@ int main( int argc, char* argv[] ){
 
     loadMNIST(trainPath, labelsPath, numRows, numCols, numImages, trainingVectors, trainingClasses  );
     
-    
-    Mat testImg; 
-
-    //resize(trainingVectors, testImg, Size(1200,1000), 0, 0 , INTER_NEAREST);
-    //imshow("test", testImg);
-    //waitKey(); 
     trainingVectors.convertTo(trainingVectors, CV_32FC1, 1.0/255.0);
     trainingClasses.convertTo(trainingClasses, CV_32FC1);
-    //cout << "M = " << endl << " " << trainingVectors << endl << endl;
-    
+    /*for(int i = 0; i<numImages; i++){
+        printf("Number = %1.1f\n",trainingClasses.at<float>(1, i));
+        for(int j = 0; j<784; j++){
+           printf("%1.1f ",trainingVectors.at<float>(i, j));
+           if((j+1) % 28 == 0) putchar('\n');
+        }
+        putchar('\n');
+    }*/
+    knn->setAlgorithmType(1); 
     knn->train(trainingVectors, ml::ROW_SAMPLE,trainingClasses);
     if(knn->isTrained())
         std::cout << "training succ" << std::endl;
 
-
-
     int dist = ceil((double)maxLength/9);
     Mat currentCell = Mat(dist, dist, CV_8UC1);
-    //cout << "UT = " << endl << " " << undistortedThreshed << endl << endl;
     for(int j=0;j<9;j++){
         for(int i=0;i<9;i++){
             for(int y=0;y<dist && j*dist+y<undistortedThreshed.cols;y++){
@@ -641,24 +645,19 @@ int main( int argc, char* argv[] ){
             }
             Moments m = cv::moments(currentCell, true);
             int area = m.m00;
-            //cout << area << endl;
             imshow("currentCell" , currentCell);
-           
             waitKey(0);
             if(area > currentCell.rows*currentCell.cols/4){
                 Mat cloneImg = preprocessImage(currentCell, numRows, numCols);
-                //imshow("after process" , cloneImg);
                 Mat response;
                 float number = knn->findNearest(cloneImg, 1, response, noArray(), noArray());
-                cout << "M = " << endl << " " << response << endl << endl;
-                //waitKey(0);
-                cout << int(number) <<" ";
+                printf("%d ", (int)number);
             }
             else{
-                cout <<"0 ";
+                printf("0 ");
             }
         }
-        cout << endl;
+        printf("\n");
     }
 
     
