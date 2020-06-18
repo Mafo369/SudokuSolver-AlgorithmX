@@ -290,73 +290,6 @@ bool loadMNIST(string trainPath, string labelsPath, int &numRows, int &numCols, 
 }
 
 
-bool loadDataset(string trainPath, string labelsPath, int &numRows, int &numCols, int &numImages, Mat &trainingVectors, Mat &trainingClasses){
-    int n = trainPath.length();
-    char trainName[n+1];
-    strcpy(trainName, trainPath.c_str());    
-    n = labelsPath.length();
-    char labelsName[n+1];
-    strcpy(labelsName, labelsPath.c_str());
-    
-    FILE *fp = fopen(trainName, "rb");
-    FILE *fp2 = fopen(labelsName, "rb");
-
-    if(!fp || !fp2){
-        cout << "Could not open training files" <<endl;
-        return false;
-    }
-    
-
-    //Read images
-    // Read bytes in flipped order
-    int magicNumber = readFlippedInteger(fp);
-    numImages = readFlippedInteger(fp);
-    numRows = readFlippedInteger(fp);
-
-    numCols = readFlippedInteger(fp);
-    cout << numImages <<" " << numRows <<" " << numCols << endl;
-
-    fseek(fp2, 0x08, SEEK_SET);
-    fseek(fp, 0x16, SEEK_SET);
-
-
-    if(numImages > MAX_NUM_IMAGES) numImages = MAX_NUM_IMAGES;
-    
-    //////////////////////////////////////////////////////////////////
-    // Go through each training data entry and save a
-
-    // label for each digit
-
-    int size = (numRows) * (numCols);
-    trainingVectors = Mat(numImages, size, CV_8UC1);
-
-    trainingClasses = Mat(numImages, 1, CV_8UC1);
-
-    memset(trainingClasses.data, 0, sizeof(uchar)*(numImages));
-
-    BYTE tempo[size];
-    BYTE tempClass=0;
-    for(int i=0;i<numImages;i++){
-        fread((void*)tempo, sizeof(BYTE), size, fp);
-
-        fread((void*)(&tempClass), sizeof(BYTE), 1, fp2);
-        
-
-        trainingClasses.data[i] = tempClass;
-        //read(fp, (void *)tempo, 784*sizeof(BYTE));
-        for(int k=0;k<size;k++){
-            trainingVectors.at<BYTE>(i*size+k) = tempo[k]; ///sumofsquares;
-            if(i==0){
-                printf("%1.1f ", (float)tempo[k]);
-		        if ((k+1) % 28 == 0) putchar('\n');
-            }
-        }
-        if(trainingVectors.empty())
-            cout << "Empty" << endl; 
-    }
-    //cout << "M = " << endl << " " << trainingClasses << endl << endl;
-    return true;
-}
 /*
 Mat deskew(Mat& img)
 {
@@ -378,6 +311,54 @@ Mat deskew(Mat& img)
 }*/
 
 
+bool loadDigitsDataset(Mat &trainData, Mat &responces, int &numRows, int &numCols, int &numImages){
+    int num = 775;
+    numImages = num;
+    int size = 16 * 16;
+    trainData = Mat(Size(size, num), CV_32FC1);
+    responces = Mat(Size(1, num), CV_32FC1);
+    int counter = 0;
+    for(int i=0;i<=9;i++){
+        // reading the images from the folder of tarining samples
+        DIR *dir;
+        struct dirent *ent;
+        char pathToImages[]="./digits3"; // name of the folder containing images
+        char path[255];
+        sprintf(path, "%s/%d", pathToImages, i);
+        if ((dir = opendir(path)) != NULL){
+            while ((ent = readdir (dir)) != NULL){
+                if (strcmp(ent->d_name, ".") != 0 && strcmp(ent->d_name, "..") != 0 ){
+                    char text[255];
+                    sprintf(text,"/%s",ent->d_name);
+                    string digit(text);
+                    digit=path+digit;
+                    Mat mat=imread(digit,1); //loading the image
+                    cvtColor(mat,mat, COLOR_RGB2GRAY);  //converting into grayscale
+                    threshold(mat , mat , 200, 255 ,THRESH_OTSU); // preprocessing
+                    mat.convertTo(mat,CV_32FC1,1.0/255.0); //necessary to convert images to CV_32FC1 for using K nearest neighbour algorithm
+                    numRows = 16;
+                    numCols = 16;
+                    resize(mat, mat, Size(numRows, numCols ),0,0,INTER_NEAREST); // same size as our testing samples
+                    //cout << "number " << i << endl;
+                    //imshow("mat", mat);
+                    //waitKey(0);
+                    //cout << "M = " << endl << " " << mat << endl << endl;
+                    mat.reshape(1,1);
+                    for (int k=0; k<size;k++) {
+                        trainData.at<float>(counter*size+k) = mat.at<float>(k); // storing the pixels of the image
+                          
+                        //trainData.at<float>(i ,counter*numCols+k) = mat.at<float>(k);
+                    }
+
+                    responces.at<float>(counter) = i; // stroing the responce corresponding to image
+                    counter++;
+                }
+            }
+        }
+        closedir(dir);
+    }
+    return true;
+}
 
 int main( int argc, char* argv[] ){
 	// Read original image 
@@ -614,19 +595,19 @@ int main( int argc, char* argv[] ){
     int numRows, numCols, numImages;
     Mat trainingVectors, trainingClasses;
 
-    loadMNIST(trainPath, labelsPath, numRows, numCols, numImages, trainingVectors, trainingClasses  );
-    
-    trainingVectors.convertTo(trainingVectors, CV_32FC1, 1.0/255.0);
-    trainingClasses.convertTo(trainingClasses, CV_32FC1);
-    /*for(int i = 0; i<numImages; i++){
+    //loadMNIST(trainPath, labelsPath, numRows, numCols, numImages, trainingVectors, trainingClasses  );
+     
+    loadDigitsDataset(trainingVectors, trainingClasses, numRows, numCols, numImages  );
+    //trainingVectors.convertTo(trainingVectors, CV_32FC1, 1.0/255.0);
+    //trainingClasses.convertTo(trainingClasses, CV_32SC1);
+    for(int i = 0; i<numImages; i++){
         printf("Number = %1.1f\n",trainingClasses.at<float>(1, i));
-        for(int j = 0; j<784; j++){
+        for(int j = 0; j<256; j++){
            printf("%1.1f ",trainingVectors.at<float>(i, j));
-           if((j+1) % 28 == 0) putchar('\n');
+           if((j+1) % 16 == 0) putchar('\n');
         }
         putchar('\n');
-    }*/
-    knn->setAlgorithmType(1); 
+    }
     knn->train(trainingVectors, ml::ROW_SAMPLE,trainingClasses);
     if(knn->isTrained())
         std::cout << "training succ" << std::endl;
