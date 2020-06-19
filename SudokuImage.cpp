@@ -130,6 +130,7 @@ int readFlippedInteger(FILE *fp)
 Mat preprocessImage(Mat img, int numRows, int numCols)
 {
 
+
     int rowTop=-1, rowBottom=-1, colLeft=-1, colRight=-1;
 
     Mat temp;
@@ -201,6 +202,24 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
         floodFill(cloneImg, Point(i, 0), Scalar(0));
         floodFill(cloneImg, Point(i, cloneImg.rows-1), Scalar(0));
     }
+    Mat realClone = cloneImg.clone();
+    vector<vector<Point>> countours;
+    findContours(cloneImg, countours, RETR_LIST, CHAIN_APPROX_SIMPLE);
+    Rect prevb; double areaprev = 0; double area; int q;
+    for(int i = 0; i<countours.size();i++){
+        Rect bnd = boundingRect(countours[i]);
+        area = bnd.height*bnd.width;
+        if(area > areaprev){
+            prevb = bnd;
+            areaprev = area;
+            q = i;
+        }
+    }
+    Rect rec = prevb;
+    Mat region = realClone(rec);
+    if(!region.empty())
+        resize(region, cloneImg, Size(numRows, numCols), 0, 0, INTER_NEAREST);   
+
     cloneImg.convertTo(cloneImg, CV_32FC1, 1.0/255.0 );
     imshow("clone img", cloneImg);
     waitKey(0);
@@ -358,6 +377,26 @@ bool loadDigitsDataset(Mat &trainData, Mat &responces, int &numRows, int &numCol
         closedir(dir);
     }
     return true;
+}
+
+
+
+int morph_elem = 0;
+int morph_size = 0;
+int morph_operator = 0;
+int const max_operator = 4;
+int const max_elem = 2;
+int const max_kernel_size = 21;
+const char* window_name = "Morphology Transformations Demo";
+Mat glo;
+
+void Morphology_Operations( int, void* )
+{
+  // Since MORPH_X : 2,3,4,5 and 6
+  int operation = morph_operator + 2;
+  Mat element = getStructuringElement( morph_elem, Size( 2*morph_size + 1, 2*morph_size+1 ), Point( morph_size, morph_size ) );
+  morphologyEx( glo, glo, operation, element );
+  imshow( window_name, glo );
 }
 
 int main( int argc, char* argv[] ){
@@ -608,12 +647,59 @@ int main( int argc, char* argv[] ){
         }
         putchar('\n');
     }
+
+    knn->setDefaultK(7);
+
     knn->train(trainingVectors, ml::ROW_SAMPLE,trainingClasses);
     if(knn->isTrained())
         std::cout << "training succ" << std::endl;
 
     int dist = ceil((double)maxLength/9);
     Mat currentCell = Mat(dist, dist, CV_8UC1);
+
+    vector<vector<Point>> cnts;
+    findContours(undistortedThreshed, cnts, RETR_TREE, CHAIN_APPROX_SIMPLE); 
+    
+    
+    for(int i = 0; i<cnts.size(); i++){ 
+        double contour = contourArea(cnts[i]);
+        if(contour < 1000){
+            drawContours(undistortedThreshed, cnts, i, Scalar(0,0,0), -1, LINE_8, noArray(), 0);
+        }
+    }
+
+    Mat vertical_kernel = getStructuringElement(MORPH_RECT, Size(23, 23),Point(11,11));
+    morphologyEx(undistortedThreshed, undistortedThreshed ,MORPH_CLOSE, vertical_kernel);
+    //Mat horizontal_kernel = getStructuringElement(MORPH_RECT, Point(-1, 1));
+    //morphologyEx(undistortedThreshed, undistortedThreshed ,MORPH_CLOSE, horizontal_kernel, Point(-1,1), 4);
+    
+    /*glo = undistortedThreshed.clone();
+    namedWindow( window_name, WINDOW_AUTOSIZE ); // Create window
+  createTrackbar("Operator:\n 0: Opening - 1: Closing  \n 2: Gradient - 3: Top Hat \n 4: Black Hat", window_name, &morph_operator, max_operator, Morphology_Operations );
+    createTrackbar( "Element:\n 0: Rect - 1: Cross - 2: Ellipse", window_name,
+                  &morph_elem, max_elem,
+                  Morphology_Operations );
+  createTrackbar( "Kernel size:\n 2n +1", window_name,
+                  &morph_size, max_kernel_size,
+                  Morphology_Operations );
+Morphology_Operations( 0, 0 );
+  waitKey(0); 
+*/
+
+    Mat invert = 255 - undistortedThreshed;
+    findContours(invert, cnts, RETR_TREE, CHAIN_APPROX_SIMPLE);
+    //sort(cnts.begin(), cnts.end());
+    
+    for(int i = 0; i<cnts.size(); i++){ 
+        double contour = contourArea(cnts[i]);
+        if(contour < 50000){
+            drawContours(undistortedThreshed, cnts, i, Scalar(0,0,0), -1, LINE_8, noArray(), 0);
+        }
+    }
+
+    imshow("lol", undistortedThreshed);
+    waitKey(0);
+
     for(int j=0;j<9;j++){
         for(int i=0;i<9;i++){
             for(int y=0;y<dist && j*dist+y<undistortedThreshed.cols;y++){
@@ -624,14 +710,18 @@ int main( int argc, char* argv[] ){
                     ptr[x] = undistortedThreshed.at<uchar>(j*dist+y, i*dist+x);
                 }
             }
+             
+            
+            // Now fill along the borders
             Moments m = cv::moments(currentCell, true);
             int area = m.m00;
             imshow("currentCell" , currentCell);
             waitKey(0);
+
             if(area > currentCell.rows*currentCell.cols/4){
                 Mat cloneImg = preprocessImage(currentCell, numRows, numCols);
                 Mat response;
-                float number = knn->findNearest(cloneImg, 1, response, noArray(), noArray());
+                float number = knn->findNearest(cloneImg, knn->getDefaultK(), response, noArray(), noArray());
                 printf("%d ", (int)number);
             }
             else{
