@@ -193,7 +193,7 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
     Mat cloneImg = Mat(numRows, numCols, CV_8UC1);
     resize(newImg, cloneImg, Size(numRows, numCols), 0, 0 , INTER_NEAREST);
     // Now fill along the borders
-    for(int i=0;i<cloneImg.rows;i++)
+    /*for(int i=0;i<cloneImg.rows;i++)
     {
         floodFill(cloneImg, Point(0, i), Scalar(0,0,0));
 
@@ -201,7 +201,7 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
 
         floodFill(cloneImg, Point(i, 0), Scalar(0));
         floodFill(cloneImg, Point(i, cloneImg.rows-1), Scalar(0));
-    }
+    }*/
     Mat realClone = cloneImg.clone();
     vector<vector<Point>> countours;
     findContours(cloneImg, countours, RETR_LIST, CHAIN_APPROX_SIMPLE);
@@ -379,25 +379,6 @@ bool loadDigitsDataset(Mat &trainData, Mat &responces, int &numRows, int &numCol
     return true;
 }
 
-
-
-int morph_elem = 0;
-int morph_size = 0;
-int morph_operator = 0;
-int const max_operator = 4;
-int const max_elem = 2;
-int const max_kernel_size = 21;
-const char* window_name = "Morphology Transformations Demo";
-Mat glo;
-
-void Morphology_Operations( int, void* )
-{
-  // Since MORPH_X : 2,3,4,5 and 6
-  int operation = morph_operator + 2;
-  Mat element = getStructuringElement( morph_elem, Size( 2*morph_size + 1, 2*morph_size+1 ), Point( morph_size, morph_size ) );
-  morphologyEx( glo, glo, operation, element );
-  imshow( window_name, glo );
-}
 
 int main( int argc, char* argv[] ){
 	// Read original image 
@@ -657,48 +638,54 @@ int main( int argc, char* argv[] ){
     int dist = ceil((double)maxLength/9);
     Mat currentCell = Mat(dist, dist, CV_8UC1);
 
+
+    Mat horizontal = undistortedThreshed.clone();
+    Mat vertical = undistortedThreshed.clone();
+
     vector<vector<Point>> cnts;
-    findContours(undistortedThreshed, cnts, RETR_TREE, CHAIN_APPROX_SIMPLE); 
     
+    Mat thresh = undistortedThreshed.clone();
+
+    findContours(thresh, cnts, RETR_TREE, CHAIN_APPROX_SIMPLE); 
     
+     
     for(int i = 0; i<cnts.size(); i++){ 
         double contour = contourArea(cnts[i]);
         if(contour < 1000){
-            drawContours(undistortedThreshed, cnts, i, Scalar(0,0,0), -1, LINE_8, noArray(), 0);
+            drawContours(thresh, cnts, i, Scalar(0,0,0), -1, LINE_8, noArray(), 0);
         }
     }
-
-    Mat vertical_kernel = getStructuringElement(MORPH_RECT, Size(23, 23),Point(11,11));
-    morphologyEx(undistortedThreshed, undistortedThreshed ,MORPH_CLOSE, vertical_kernel);
-    //Mat horizontal_kernel = getStructuringElement(MORPH_RECT, Point(-1, 1));
-    //morphologyEx(undistortedThreshed, undistortedThreshed ,MORPH_CLOSE, horizontal_kernel, Point(-1,1), 4);
     
-    /*glo = undistortedThreshed.clone();
-    namedWindow( window_name, WINDOW_AUTOSIZE ); // Create window
-  createTrackbar("Operator:\n 0: Opening - 1: Closing  \n 2: Gradient - 3: Top Hat \n 4: Black Hat", window_name, &morph_operator, max_operator, Morphology_Operations );
-    createTrackbar( "Element:\n 0: Rect - 1: Cross - 2: Ellipse", window_name,
-                  &morph_elem, max_elem,
-                  Morphology_Operations );
-  createTrackbar( "Kernel size:\n 2n +1", window_name,
-                  &morph_size, max_kernel_size,
-                  Morphology_Operations );
-Morphology_Operations( 0, 0 );
-  waitKey(0); 
-*/
+    undistortedThreshed = undistortedThreshed - thresh;
 
-    Mat invert = 255 - undistortedThreshed;
-    findContours(invert, cnts, RETR_TREE, CHAIN_APPROX_SIMPLE);
-    //sort(cnts.begin(), cnts.end());
-    
-    for(int i = 0; i<cnts.size(); i++){ 
-        double contour = contourArea(cnts[i]);
-        if(contour < 50000){
-            drawContours(undistortedThreshed, cnts, i, Scalar(0,0,0), -1, LINE_8, noArray(), 0);
-        }
-    }
-
-    imshow("lol", undistortedThreshed);
+    imshow("d", thresh);
     waitKey(0);
+    
+    int vertical_size = vertical.cols/30; 
+    
+    Mat vertical_kernel = getStructuringElement(MORPH_RECT, Size(1, vertical_size));
+    morphologyEx(thresh, thresh ,MORPH_CLOSE, vertical_kernel, Point(-1,-1), 2);
+    
+    //erode(vertical, vertical, vertical_kernel, Point(-1, -1));
+    //dilate(vertical, vertical, vertical_kernel, Point(-1,-1));
+    imshow("vertical", thresh);
+    waitKey(0);
+
+    int horizontal_size = horizontal.rows/3;
+    Mat horizontal_kernel = getStructuringElement(MORPH_RECT, Size(horizontal_size, 1));
+    //morphologyEx(undistortedThreshed, undistortedThreshed ,MORPH_CLOSE, horizontal_kernel, Point(-1,1), 4);
+    erode(horizontal, horizontal, horizontal_kernel, Point(-1, -1));
+    dilate(horizontal, horizontal, horizontal_kernel, Point(-1,-1));
+  
+    imshow("hori", horizontal);
+    waitKey();
+
+    undistortedThreshed = undistortedThreshed - horizontal;
+    undistortedThreshed = undistortedThreshed - vertical;
+
+    imshow("loll", undistortedThreshed);
+    waitKey();
+
 
     for(int j=0;j<9;j++){
         for(int i=0;i<9;i++){
@@ -718,7 +705,7 @@ Morphology_Operations( 0, 0 );
             imshow("currentCell" , currentCell);
             waitKey(0);
 
-            if(area > currentCell.rows*currentCell.cols/4){
+            if(area > 20){
                 Mat cloneImg = preprocessImage(currentCell, numRows, numCols);
                 Mat response;
                 float number = knn->findNearest(cloneImg, knn->getDefaultK(), response, noArray(), noArray());
