@@ -1,7 +1,9 @@
 CMakeFiles/
 
 CMakeCache.txt
+Makefile
 
 *.cmake
 *.o
+*.out
 *.exe
