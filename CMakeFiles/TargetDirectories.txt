@@ -1,3 +1,0 @@
-/home/mafo/dev/sudoku/CMakeFiles/rebuild_cache.dir
-/home/mafo/dev/sudoku/CMakeFiles/SudokuImage.dir
-/home/mafo/dev/sudoku/CMakeFiles/edit_cache.dir
