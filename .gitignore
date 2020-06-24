@@ -1,8 +1,10 @@
 CMakeFiles/
 
+
 CMakeCache.txt
 Makefile
 SudokuImage
+
 
 *.cmake
 *.o
