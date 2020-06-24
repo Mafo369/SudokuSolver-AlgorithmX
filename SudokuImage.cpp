@@ -6,7 +6,7 @@ using namespace ml;
 
 int main( int argc, char* argv[] ){
 	// Read original image 
-	Mat src = imread("sudoku.jpg", IMREAD_GRAYSCALE );
+	Mat src = imread("testPhotos/sudoku.jpg", IMREAD_GRAYSCALE );
 
 	//if fail to read the image
 	if (!src.data){
@@ -323,8 +323,6 @@ int main( int argc, char* argv[] ){
                 }
             }
              
-            
-            // Now fill along the borders
             Moments m = cv::moments(currentCell, true);
             int area = m.m00;
             imshow("currentCell" , currentCell);
