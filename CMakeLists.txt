@@ -5,3 +5,4 @@ include_directories( ${OpenCV_INCLUDE_DIRS} )
 add_executable( SudokuImage SudokuImage.cpp ImageProcessing.cpp)
 target_link_libraries( SudokuImage ${OpenCV_LIBS} )
 add_definitions( "-Wall -g" )
+
