@@ -81,40 +81,40 @@ CMakeFiles/SudokuImage.dir/SudokuImage.cpp.o.provides: CMakeFiles/SudokuImage.di
 CMakeFiles/SudokuImage.dir/SudokuImage.cpp.o.provides.build: CMakeFiles/SudokuImage.dir/SudokuImage.cpp.o
 
 
-CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o: CMakeFiles/SudokuImage.dir/flags.make
-CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o: digitrecognizer.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/mafo/dev/sudoku/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o"
-	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o -c /home/mafo/dev/sudoku/digitrecognizer.cpp
+CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o: CMakeFiles/SudokuImage.dir/flags.make
+CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o: ImageProcessing.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/mafo/dev/sudoku/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o"
+	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o -c /home/mafo/dev/sudoku/ImageProcessing.cpp
 
-CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/mafo/dev/sudoku/digitrecognizer.cpp > CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.i
+CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/mafo/dev/sudoku/ImageProcessing.cpp > CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.i
 
-CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/mafo/dev/sudoku/digitrecognizer.cpp -o CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.s
+CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/mafo/dev/sudoku/ImageProcessing.cpp -o CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.s
 
-CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o.requires:
+CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o.requires:
 
-.PHONY : CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o.requires
+.PHONY : CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o.requires
 
-CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o.provides: CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o.requires
-	$(MAKE) -f CMakeFiles/SudokuImage.dir/build.make CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o.provides.build
-.PHONY : CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o.provides
+CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o.provides: CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o.requires
+	$(MAKE) -f CMakeFiles/SudokuImage.dir/build.make CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o.provides.build
+.PHONY : CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o.provides
 
-CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o.provides.build: CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o
+CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o.provides.build: CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o
 
 
 # Object files for target SudokuImage
 SudokuImage_OBJECTS = \
 "CMakeFiles/SudokuImage.dir/SudokuImage.cpp.o" \
-"CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o"
+"CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o"
 
 # External object files for target SudokuImage
 SudokuImage_EXTERNAL_OBJECTS =
 
 SudokuImage: CMakeFiles/SudokuImage.dir/SudokuImage.cpp.o
-SudokuImage: CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o
+SudokuImage: CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o
 SudokuImage: CMakeFiles/SudokuImage.dir/build.make
 SudokuImage: /usr/local/lib/libopencv_dnn.so.4.3.0
 SudokuImage: /usr/local/lib/libopencv_gapi.so.4.3.0
@@ -141,7 +141,7 @@ CMakeFiles/SudokuImage.dir/build: SudokuImage
 .PHONY : CMakeFiles/SudokuImage.dir/build
 
 CMakeFiles/SudokuImage.dir/requires: CMakeFiles/SudokuImage.dir/SudokuImage.cpp.o.requires
-CMakeFiles/SudokuImage.dir/requires: CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o.requires
+CMakeFiles/SudokuImage.dir/requires: CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o.requires
 
 .PHONY : CMakeFiles/SudokuImage.dir/requires
 

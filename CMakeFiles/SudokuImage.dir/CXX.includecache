@@ -6,39 +6,31 @@
 
 #IncludeRegexTransform: 
 
-/home/mafo/dev/sudoku/SudokuImage.cpp
+/home/mafo/dev/sudoku/ImageProcessing.cpp
+ImageProcessing.h
+/home/mafo/dev/sudoku/ImageProcessing.h
+
+/home/mafo/dev/sudoku/ImageProcessing.h
 opencv2/opencv.hpp
 -
-opencv2/ml.hpp
--
-digitrecognizer.h
-/home/mafo/dev/sudoku/digitrecognizer.h
 stdlib.h
 -
 stdio.h
 -
 iostream
 -
-fstream
--
 dirent.h
 -
-stdio.h
+fstream
 -
 
-/home/mafo/dev/sudoku/digitrecognizer.cpp
-digitrecognizer.h
-/home/mafo/dev/sudoku/digitrecognizer.h
-
-/home/mafo/dev/sudoku/digitrecognizer.h
+/home/mafo/dev/sudoku/SudokuImage.cpp
 opencv2/opencv.hpp
 -
 opencv2/ml.hpp
 -
-string
--
-cerrno
--
+ImageProcessing.h
+/home/mafo/dev/sudoku/ImageProcessing.h
 
 /usr/local/include/opencv4/opencv2/calib3d.hpp
 opencv2/core.hpp

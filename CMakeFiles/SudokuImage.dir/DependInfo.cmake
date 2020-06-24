@@ -4,8 +4,8 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_CXX
+  "/home/mafo/dev/sudoku/ImageProcessing.cpp" "/home/mafo/dev/sudoku/CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o"
   "/home/mafo/dev/sudoku/SudokuImage.cpp" "/home/mafo/dev/sudoku/CMakeFiles/SudokuImage.dir/SudokuImage.cpp.o"
-  "/home/mafo/dev/sudoku/digitrecognizer.cpp" "/home/mafo/dev/sudoku/CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o"
   )
 set(CMAKE_CXX_COMPILER_ID "GNU")
 

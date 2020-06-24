@@ -1,6 +1,6 @@
 file(REMOVE_RECURSE
   "CMakeFiles/SudokuImage.dir/SudokuImage.cpp.o"
-  "CMakeFiles/SudokuImage.dir/digitrecognizer.cpp.o"
+  "CMakeFiles/SudokuImage.dir/ImageProcessing.cpp.o"
   "SudokuImage.pdb"
   "SudokuImage"
 )

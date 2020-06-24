@@ -1,384 +1,8 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/ml.hpp>
 
-#include "digitrecognizer.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <iostream>
-#include <fstream>
-#include <dirent.h>
-using namespace cv;
-using namespace std;
+#include "ImageProcessing.h"
 using namespace ml;
-
-#include <stdio.h>
-
-// UNASSIGNED is used for empty cells in sudoku
-#define UNASSIGNED 0
-
-// N is used for size of Sudoku grid. Size will be NxN
-#define N 9
-
-typedef unsigned char BYTE;
-
-
-/*HOGDescriptor hog(
-        Size(20,20), //winSize
-        Size(10,10), //blocksize
-        Size(5,5), //blockStride,
-        Size(10,10), //cellSize,
-                 9, //nbins,
-                  1, //derivAper,
-                 -1, //winSigma,
-                  0, //histogramNormType,
-                0.2, //L2HysThresh,
-                  1,//gammal correction,
-                  64,//nlevels=64
-                  1);//Use signed gradients
-*/
-
-void drawLine(Vec2f line, Mat &img, Scalar rgb = CV_RGB(0,0,255)){
-    if(line[1]!=0){
-        float m = -1/tan(line[1]);
-
-        float c = line[0]/sin(line[1]);
-
-        cv::line(img, Point(0, c), Point(img.size().width, m*img.size().width+c), rgb);
-    }
-    else{
-        cv::line(img, Point(line[0], 0), Point(line[0], img.size().height), rgb);
-    }
-
-}
-
-void mergeRelatedLines(vector<Vec2f> *lines, Mat &img){
-    vector<Vec2f>::iterator current;
-    for(current=lines->begin();current!=lines->end();current++){
-        if((*current)[0]==0 && (*current)[1]==-100) continue;
-        float p1 = (*current)[0];
-        float theta1 = (*current)[1];
-        Point pt1current, pt2current;
-        if(theta1>CV_PI*45/180 && theta1<CV_PI*135/180){
-            pt1current.x=0;
-
-            pt1current.y = p1/sin(theta1);
-
-            pt2current.x=img.size().width;
-            pt2current.y=-pt2current.x/tan(theta1) + p1/sin(theta1);
-        }
-        else{
-            pt1current.y=0;
-
-            pt1current.x=p1/cos(theta1);
-
-            pt2current.y=img.size().height;
-            pt2current.x=-pt2current.y/tan(theta1) + p1/cos(theta1);
-
-        }
-        vector<Vec2f>::iterator    pos;
-        for(pos=lines->begin();pos!=lines->end();pos++){
-            if(*current==*pos) continue;
-            if(fabs((*pos)[0]-(*current)[0])<20 && fabs((*pos)[1]-(*current)[1])<CV_PI*10/180){
-                float p = (*pos)[0];
-                float theta = (*pos)[1];
-                Point pt1, pt2;
-                if((*pos)[1]>CV_PI*45/180 && (*pos)[1]<CV_PI*135/180){
-                    pt1.x=0;
-                    pt1.y = p/sin(theta);
-                    pt2.x=img.size().width;
-                    pt2.y=-pt2.x/tan(theta) + p/sin(theta);
-                }
-                else{
-                    pt1.y=0;
-                    pt1.x=p/cos(theta);
-                    pt2.y=img.size().height;
-                    pt2.x=-pt2.y/tan(theta) + p/cos(theta);
-                }
-                if(((double)(pt1.x-pt1current.x)*(pt1.x-pt1current.x) + (pt1.y-pt1current.y)*(pt1.y-pt1current.y)<64*64) &&
-                    ((double)(pt2.x-pt2current.x)*(pt2.x-pt2current.x) + (pt2.y-pt2current.y)*(pt2.y-pt2current.y)<64*64))
-                {
-                    // Merge the two
-                    (*current)[0] = ((*current)[0]+(*pos)[0])/2;
-
-                    (*current)[1] = ((*current)[1]+(*pos)[1])/2;
-
-                    (*pos)[0]=0;
-                    (*pos)[1]=-100;
-                }
-            }
-        }
-    }
-}
-
-int readFlippedInteger(FILE *fp)
-{
-    int ret = 0;
-
-    BYTE *temp;
-
-    temp = (BYTE*)(&ret);
-    fread(&temp[3], sizeof(BYTE), 1, fp);
-    fread(&temp[2], sizeof(BYTE), 1, fp);
-    fread(&temp[1], sizeof(BYTE), 1, fp);
-
-    fread(&temp[0], sizeof(BYTE), 1, fp);
-
-    return ret;
-
-}
-
-Mat preprocessImage(Mat img, int numRows, int numCols)
-{
-
-
-    int rowTop=-1, rowBottom=-1, colLeft=-1, colRight=-1;
-
-    Mat temp;
-    int thresholdBottom = 50;
-    int thresholdTop = 50;
-    int thresholdLeft = 50;
-    int thresholdRight = 50;
-    int center = img.rows/2;
-    for(int i=center;i<img.rows;i++){
-        if(rowBottom==-1)
-        {
-            temp = img.row(i);
-            Mat stub = temp;
-            if(sum(stub).val[0] < thresholdBottom || i==img.rows-1)
-                rowBottom = i;
-
-        }
-
-        if(rowTop==-1)
-        {
-            temp = img.row(img.rows-i);
-            Mat stub = temp;
-            if(sum(stub).val[0] < thresholdTop || i==img.rows-1)
-                rowTop = img.rows-i;
-
-        }
-        if(colRight==-1)
-        {
-            temp = img.col(i);
-            Mat stub = temp;
-            if(sum(stub).val[0] < thresholdRight|| i==img.cols-1)
-                colRight = i;
-
-        }
-
-        if(colLeft==-1)
-        {
-            temp = img.col(img.cols-i);
-            Mat stub = temp;
-            if(sum(stub).val[0] < thresholdLeft|| i==img.cols-1)
-                colLeft = img.cols-i;
-        }
-    }
-    Mat newImg;
-
-    newImg = newImg.zeros(img.rows, img.cols, CV_8UC1);
-
-    int startAtX = (newImg.cols/2)-(colRight-colLeft)/2;
-
-    int startAtY = (newImg.rows/2)-(rowBottom-rowTop)/2;
-
-    for(int y=startAtY;y<(newImg.rows/2)+(rowBottom-rowTop)/2;y++)
-    {
-        uchar *ptr = newImg.ptr<uchar>(y);
-        for(int x=startAtX;x<(newImg.cols/2)+(colRight-colLeft)/2;x++)
-        {
-            ptr[x] = img.at<uchar>(rowTop+(y-startAtY),colLeft+(x-startAtX));
-        }
-    }
-    Mat cloneImg = Mat(numRows, numCols, CV_8UC1);
-    resize(newImg, cloneImg, Size(numRows, numCols), 0, 0 , INTER_NEAREST);
-    // Now fill along the borders
-    /*for(int i=0;i<cloneImg.rows;i++)
-    {
-        floodFill(cloneImg, Point(0, i), Scalar(0,0,0));
-
-        floodFill(cloneImg, Point(cloneImg.cols-1, i), Scalar(0,0,0));
-
-        floodFill(cloneImg, Point(i, 0), Scalar(0));
-        floodFill(cloneImg, Point(i, cloneImg.rows-1), Scalar(0));
-    }*/
-    Mat realClone = cloneImg.clone();
-    vector<vector<Point>> countours;
-    findContours(cloneImg, countours, RETR_LIST, CHAIN_APPROX_SIMPLE);
-    Rect prevb; double areaprev = 0; double area; int q;
-    for(int i = 0; i<countours.size();i++){
-        Rect bnd = boundingRect(countours[i]);
-        area = bnd.height*bnd.width;
-        if(area > areaprev){
-            prevb = bnd;
-            areaprev = area;
-            q = i;
-        }
-    }
-    Rect rec = prevb;
-    Mat region = realClone(rec);
-    if(!region.empty())
-        resize(region, cloneImg, Size(numRows, numCols), 0, 0, INTER_NEAREST);   
-
-    cloneImg.convertTo(cloneImg, CV_32FC1, 1.0/255.0 );
-    imshow("clone img", cloneImg);
-    waitKey(0);
-    cloneImg = cloneImg.reshape(1,1);
-    return cloneImg;
-}
-
-int reverseInt(int i) {
-    unsigned char c1, c2, c3, c4;
-    c1 = i & 255;
-    c2 = (i >> 8) & 255;
-    c3 = (i >> 16) & 255;
-    c4 = (i >> 24) & 255;
-    return ((int)c1 << 24) + ((int)c2 << 16) + ((int)c3 << 8) + c4;
-}
-
-bool loadMNIST(string trainPath, string labelsPath, int &numRows, int &numCols, int &numImages, Mat &trainingVectors, Mat &trainingClasses){
-    int n = trainPath.length();
-    char trainName[n+1];
-    strcpy(trainName, trainPath.c_str());    
-    n = labelsPath.length();
-    char labelsName[n+1];
-    strcpy(labelsName, labelsPath.c_str());
-
-    ifstream file (trainName, ios::binary);
-    if(file.is_open()){
-        int magic_number=0;int r; int c;
-        Size size;unsigned char temp=0;
-
-        file.read((char*)&magic_number,sizeof(magic_number)); 
-        magic_number= reverseInt(magic_number);
-
-        file.read((char*)&numImages,sizeof(numImages));
-        numImages= reverseInt(numImages);
-        
-        file.read((char*)&numRows,sizeof(numRows));
-        numRows= reverseInt(numRows); 
-        file.read((char*)&numCols,sizeof(numCols));
-        numCols= reverseInt(numCols);
-        printf("%d %d %d\n", numImages, numRows, numCols);
-        trainingVectors = Mat(numImages, numRows*numCols, CV_8UC1);
-        unsigned char arr[28][28];
-        for(int i=0;i<numImages;i++){
-            for(r=0;r<numRows;r++){
-                for(c=0;c<numCols;c++){                 
-                    file.read((char*)&temp,sizeof(temp));
-                    arr[r][c]= temp;
-                    trainingVectors.at<uchar>(i ,r*numCols+c) = arr[r][c];
-                    //printf("%1.1f ", (float)trainingVectors.at<uchar>(i,r*numCols+c)/255.0 );
-                }          
-                //printf("\n"); 
-            }
-            size.height=r;size.width=c;
-            //printf("\n");
-        }
-    }
-
-    ifstream fileLabels (labelsName, ios::binary);
-    if(fileLabels.is_open()){
-        int magic_number=0;int r; int c;
-        Size size;unsigned char temp=0;
-
-        fileLabels.read((char*)&magic_number,sizeof(magic_number)); 
-        magic_number= reverseInt(magic_number);
-
-        fileLabels.read((char*)&numImages,sizeof(numImages));
-        numImages= reverseInt(numImages);
-        
-        //printf("%d\n", numImages);
-        trainingClasses = Mat(numImages, 1, CV_8UC1);
-        for(int i=0;i<numImages;i++){
-            fileLabels.read((char*)&temp,sizeof(temp));
-            trainingClasses.at<uchar>(1, i) = temp;
-            //printf("%d\n", trainingClasses.at<uchar>(1,i));
-        }
-    }
-
-    /*for(int i=0;i<numImages;i++){
-        for(int c=0;c<784;c++){
-            printf("%1.1f ", (float)trainingVectors.at<uchar>(i,c)/255.0 );
-            if((c+1) % 28 == 0) putchar('\n');
-
-        }
-        printf("\n");
-    }*/
-    return true;
-}
-
-
-/*
-Mat deskew(Mat& img)
-{
-    Moments m = moments(img);
-    if(abs(m.mu02) < 1e-2)
-    {
-        // No deskewing needed. 
-        return img.clone();
-    }
-    // Calculate skew based on central momemts. 
-    double skew = m.mu11/m.mu02;
-    // Calculate affine transform to correct skewness. 
-    Mat warpMat = (Mat_<double>(2,3) << 1, skew, -0.5*SZ*skew, 0, 1 , 0);
-
-    Mat imgOut = Mat::zeros(img.rows, img.cols, img.type());
-    warpAffine(img, imgOut, warpMat, imgOut.size(),affineFlags);
-
-    return imgOut;
-}*/
-
-
-bool loadDigitsDataset(Mat &trainData, Mat &responces, int &numRows, int &numCols, int &numImages){
-    int num = 775;
-    numImages = num;
-    int size = 16 * 16;
-    trainData = Mat(Size(size, num), CV_32FC1);
-    responces = Mat(Size(1, num), CV_32FC1);
-    int counter = 0;
-    for(int i=0;i<=9;i++){
-        // reading the images from the folder of tarining samples
-        DIR *dir;
-        struct dirent *ent;
-        char pathToImages[]="./digits3"; // name of the folder containing images
-        char path[255];
-        sprintf(path, "%s/%d", pathToImages, i);
-        if ((dir = opendir(path)) != NULL){
-            while ((ent = readdir (dir)) != NULL){
-                if (strcmp(ent->d_name, ".") != 0 && strcmp(ent->d_name, "..") != 0 ){
-                    char text[255];
-                    sprintf(text,"/%s",ent->d_name);
-                    string digit(text);
-                    digit=path+digit;
-                    Mat mat=imread(digit,1); //loading the image
-                    cvtColor(mat,mat, COLOR_RGB2GRAY);  //converting into grayscale
-                    threshold(mat , mat , 200, 255 ,THRESH_OTSU); // preprocessing
-                    mat.convertTo(mat,CV_32FC1,1.0/255.0); //necessary to convert images to CV_32FC1 for using K nearest neighbour algorithm
-                    numRows = 16;
-                    numCols = 16;
-                    resize(mat, mat, Size(numRows, numCols ),0,0,INTER_NEAREST); // same size as our testing samples
-                    //cout << "number " << i << endl;
-                    //imshow("mat", mat);
-                    //waitKey(0);
-                    //cout << "M = " << endl << " " << mat << endl << endl;
-                    mat.reshape(1,1);
-                    for (int k=0; k<size;k++) {
-                        trainData.at<float>(counter*size+k) = mat.at<float>(k); // storing the pixels of the image
-                          
-                        //trainData.at<float>(i ,counter*numCols+k) = mat.at<float>(k);
-                    }
-
-                    responces.at<float>(counter) = i; // stroing the responce corresponding to image
-                    counter++;
-                }
-            }
-        }
-        closedir(dir);
-    }
-    return true;
-}
-
 
 int main( int argc, char* argv[] ){
 	// Read original image 
@@ -413,7 +37,6 @@ int main( int argc, char* argv[] ){
 	
     /***************************** Borders *******************************/
 
-    int count=0;
     int max=-1;
 
     Point maxPt;
@@ -462,10 +85,10 @@ int main( int argc, char* argv[] ){
     /****************************** Extreme Lines ***************************/
    
     // Now detect the lines on extremes
-    Vec2f topEdge = Vec2f(1000,1000);    double topYIntercept=100000, topXIntercept=0;
-    Vec2f bottomEdge = Vec2f(-1000,-1000);        double bottomYIntercept=0, bottomXIntercept=0;
-    Vec2f leftEdge = Vec2f(1000,1000);    double leftXIntercept=100000, leftYIntercept=0;
-    Vec2f rightEdge = Vec2f(-1000,-1000);        double rightXIntercept=0, rightYIntercept=0;
+    Vec2f topEdge = Vec2f(1000,1000);    
+    Vec2f bottomEdge = Vec2f(-1000,-1000);        
+    Vec2f leftEdge = Vec2f(1000,1000);    double leftXIntercept=100000;
+    Vec2f rightEdge = Vec2f(-1000,-1000);        double rightXIntercept=0;
 
     for(unsigned int i=0;i<lines.size();i++){
         Vec2f current = lines[i];
@@ -477,9 +100,7 @@ int main( int argc, char* argv[] ){
         if(p==0 && theta==-100)
             continue;
         double xIntercept;
-        double yIntercept;
         xIntercept = p/cos(theta);
-        yIntercept = p/(cos(theta)*sin(theta));
         if(theta>CV_PI*80/180 && theta<CV_PI*100/180){
             if(p<topEdge[0])
                 topEdge = current;
@@ -602,7 +223,7 @@ int main( int argc, char* argv[] ){
 
     Mat undistortedThreshed = undistorted.clone();
     adaptiveThreshold(undistorted, undistortedThreshed, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV, 101, 1);
-    imshow("new threshold", undistortedThreshed);
+    //imshow("new threshold", undistortedThreshed);
     //waitKey(0);
     //cout << "M = " << endl << " " << undistortedThreshed << endl << endl;
 
@@ -620,7 +241,7 @@ int main( int argc, char* argv[] ){
     loadDigitsDataset(trainingVectors, trainingClasses, numRows, numCols, numImages  );
     //trainingVectors.convertTo(trainingVectors, CV_32FC1, 1.0/255.0);
     //trainingClasses.convertTo(trainingClasses, CV_32SC1);
-    for(int i = 0; i<numImages; i++){
+    /*for(int i = 0; i<numImages; i++){
         printf("Number = %1.1f\n",trainingClasses.at<float>(1, i));
         for(int j = 0; j<256; j++){
            printf("%1.1f ",trainingVectors.at<float>(i, j));
@@ -628,12 +249,12 @@ int main( int argc, char* argv[] ){
         }
         putchar('\n');
     }
-
+    */
     knn->setDefaultK(7);
 
     knn->train(trainingVectors, ml::ROW_SAMPLE,trainingClasses);
     if(knn->isTrained())
-        std::cout << "training succ" << std::endl;
+        std::cout << "training DONE" << std::endl;
 
     int dist = ceil((double)maxLength/9);
     Mat currentCell = Mat(dist, dist, CV_8UC1);
@@ -649,41 +270,45 @@ int main( int argc, char* argv[] ){
     findContours(thresh, cnts, RETR_TREE, CHAIN_APPROX_SIMPLE); 
     
      
-    for(int i = 0; i<cnts.size(); i++){ 
+    for(unsigned int i = 0; i<cnts.size(); i++){ 
         double contour = contourArea(cnts[i]);
-        if(contour < 1000){
+        if(contour < 500){
             drawContours(thresh, cnts, i, Scalar(0,0,0), -1, LINE_8, noArray(), 0);
         }
     }
     
     undistortedThreshed = undistortedThreshed - thresh;
 
-    imshow("d", thresh);
-    waitKey(0);
+    //imshow("d", thresh);
+    //waitKey(0);
     
-    int vertical_size = vertical.cols/30; 
-    
+    int vertical_size = vertical.cols/50;
+    vertical_size = 5; 
     Mat vertical_kernel = getStructuringElement(MORPH_RECT, Size(1, vertical_size));
     morphologyEx(thresh, thresh ,MORPH_CLOSE, vertical_kernel, Point(-1,-1), 2);
     
     //erode(vertical, vertical, vertical_kernel, Point(-1, -1));
     //dilate(vertical, vertical, vertical_kernel, Point(-1,-1));
-    imshow("vertical", thresh);
-    waitKey(0);
+    //imshow("vertical", thresh);
+    //waitKey(0);
 
-    int horizontal_size = horizontal.rows/3;
+    int horizontal_size = horizontal.rows/50;
+    horizontal_size = vertical_size;
     Mat horizontal_kernel = getStructuringElement(MORPH_RECT, Size(horizontal_size, 1));
-    //morphologyEx(undistortedThreshed, undistortedThreshed ,MORPH_CLOSE, horizontal_kernel, Point(-1,1), 4);
-    erode(horizontal, horizontal, horizontal_kernel, Point(-1, -1));
-    dilate(horizontal, horizontal, horizontal_kernel, Point(-1,-1));
+    morphologyEx(thresh, thresh ,MORPH_CLOSE, horizontal_kernel, Point(-1,-1), 2);
+
+
+    //erode(horizontal, horizontal, horizontal_kernel, Point(-1, -1));
+    //dilate(horizontal, horizontal, horizontal_kernel, Point(-1,-1));
   
-    imshow("hori", horizontal);
-    waitKey();
+    //imshow("hori",thresh);
+    //waitKey();
 
-    undistortedThreshed = undistortedThreshed - horizontal;
-    undistortedThreshed = undistortedThreshed - vertical;
-
-    imshow("loll", undistortedThreshed);
+    //undistortedThreshed = undistortedThreshed - horizontal;
+    
+    //undistortedThreshed = undistortedThreshed - vertical;
+    undistortedThreshed = undistortedThreshed - thresh;
+    imshow("no lines", undistortedThreshed);
     waitKey();
 
 
