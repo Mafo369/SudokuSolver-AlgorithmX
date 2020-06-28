@@ -1,8 +1,123 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/ml.hpp>
+#include <vector>
 
+#include "DancingNode.h"
 #include "ImageProcessing.h"
 using namespace ml;
+
+#define MAX_ROW 1000
+#define MAX_COL 1000
+
+#define SIZE 9
+#define BOX_SIZE 3
+#define EMPTY_CELL 0
+#define CONSTRAINTS 4
+#define MIN_VALUE 1
+#define MAX_VALUE SIZE
+#define COVER_START_INDEX 1
+
+using namespace std;
+
+int indexInCoverMatrix(int row, int col, int num){
+    return (row - 1) * SIZE * SIZE + (col- 1) * SIZE + (num - 1);
+}
+
+int createBoxConstraints(vector<vector<int> > &coverMatrix, int header){
+    for (int row = COVER_START_INDEX; row <= SIZE; row += BOX_SIZE) {
+      for (int column = COVER_START_INDEX; column <= SIZE; column += BOX_SIZE) {
+        for (int n = COVER_START_INDEX; n <= SIZE; n++, header++) {
+          for (int rowDelta = 0; rowDelta < BOX_SIZE; rowDelta++) {
+            for (int columnDelta = 0; columnDelta < BOX_SIZE; columnDelta++) {
+              int index = indexInCoverMatrix(row + rowDelta, column + columnDelta, n);
+              //matrix[index][header] = 1;
+              coverMatrix[index][header] = 1;
+            }
+          }
+        }
+      }
+    }
+    return header;
+}
+
+int createColumnConstraints(vector<vector<int>> &coverMatrix, int header){
+    for (int column = COVER_START_INDEX; column <= SIZE; column++) {
+      for (int n = COVER_START_INDEX; n <= SIZE; n++, header++) {
+        for (int row = COVER_START_INDEX; row <= SIZE; row++) {
+          int index = indexInCoverMatrix(row, column, n);
+            coverMatrix[index][header] = 1;
+
+        }
+      }
+    }
+
+    return header;
+}
+
+int createRowConstraints(vector<vector<int>> &coverMatrix, int header){
+    for (int row = COVER_START_INDEX; row <= SIZE; row++) {
+      for (int n = COVER_START_INDEX; n <= SIZE; n++, header++) {
+        for (int column = COVER_START_INDEX; column <= SIZE; column++) {
+            int index = indexInCoverMatrix(row, column, n);
+            
+            coverMatrix[index][header] = 1;
+        }
+      }
+    }
+
+    return header;
+}
+
+int createCellConstraints(vector<vector<int>> &coverMatrix, int header){
+    for (int row = COVER_START_INDEX; row <= SIZE; row++) {
+        for (int column = COVER_START_INDEX; column <= SIZE; column++, header++) {
+            for (int n = COVER_START_INDEX; n <= SIZE; n++) {
+                int index = indexInCoverMatrix(row, column, n);
+                
+            coverMatrix[index][header] = 1;
+
+            }
+        }
+    }
+    return header;
+}
+
+void createCoverMatrix(vector<vector<int>> &coverMatrix){ 
+    //coverMatrix[SIZE*SIZE*MAX_VALUE][SIZE * SIZE * CONSTRAINTS];
+
+    int header = 0;
+    header = createCellConstraints(coverMatrix, header);
+    header = createRowConstraints(coverMatrix, header);
+    header = createColumnConstraints(coverMatrix, header);
+    createBoxConstraints(coverMatrix, header);
+
+}
+
+void convertInCoverMatrix(vector<vector<int>> &grid, vector<vector<int>> &coverMatrix){
+    //createCoverMatrix(coverMatrix);
+    
+    int header = 0;
+    header = createCellConstraints(coverMatrix, header);
+    header = createRowConstraints(coverMatrix, header);
+    header = createColumnConstraints(coverMatrix, header);
+    createBoxConstraints(coverMatrix, header);
+
+    // Taking into account the values already entered in Sudoku's grid instance
+    for (int row = COVER_START_INDEX; row <= SIZE; row++) {
+      for (int column = COVER_START_INDEX; column <= SIZE; column++) {
+        int n = grid[row - 1][column - 1];
+
+        if (n != EMPTY_CELL) {
+          for (int num = MIN_VALUE; num <= MAX_VALUE; num++) {
+            if (num != n) {
+                std::fill(coverMatrix[indexInCoverMatrix(row, column, num)].begin(), coverMatrix[indexInCoverMatrix(row, column, num)].end(), 0);
+            }
+          }
+        }
+      }
+    }
+}
+
 
 int main( int argc, char* argv[] ){
 	// Read original image 
@@ -311,6 +426,25 @@ int main( int argc, char* argv[] ){
     imshow("no lines", undistortedThreshed);
     waitKey();
 
+    /* List Creation */
+    // Header node, contains pointer to the
+    // list header node of first column
+    DancingNode *header = new DancingNode();
+
+    // Matrix to contain nodes of linked mesh
+    DancingNode Matrix[MAX_ROW][MAX_COL];
+
+    // Problem Matrix
+    bool ProbMat[MAX_ROW][MAX_COL];
+
+    // vector containing solutions
+    vector <DancingNode*> solutions;
+
+    // Number of rows and columns in problem matrix
+    int nRow = 9,nCol = 9;
+
+    //int grid[nRow][9];
+    vector<vector <int> > grid(9, vector<int>(9))  ;
 
     for(int j=0;j<9;j++){
         for(int i=0;i<9;i++){
@@ -333,16 +467,29 @@ int main( int argc, char* argv[] ){
                 Mat response;
                 float number = knn->findNearest(cloneImg, knn->getDefaultK(), response, noArray(), noArray());
                 printf("%d ", (int)number);
+                //grid[i][j] = (int)number;
+                grid[i].push_back((int)number);
             }
             else{
+                //grid[i][j] = 0;
+                grid[i].push_back(0);
                 printf("0 ");
             }
         }
         printf("\n");
     }
+    //int coverMatrix[SIZE*SIZE*MAX_VALUE][SIZE * SIZE * CONSTRAINTS];
+    int rowsCover = SIZE * SIZE * MAX_VALUE;
+    int colsCover = SIZE * SIZE * CONSTRAINTS;
+    cout << rowsCover << " " << colsCover << endl;
+    vector<vector<int>> coverMatrix(rowsCover, vector<int>(colsCover)) ;
+    
+    convertInCoverMatrix(grid, coverMatrix);  
+    
 
     
-	//waitKey();
+    //waitKey();
+    //cout << coverMatrix << endl;
 	return 0;
 }
 		

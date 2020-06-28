@@ -1,19 +1,19 @@
-#include "Node.h"
+#include "DancingNode.h"
 
 using namespace std; 
   
-struct s_Node 
+/*struct s_DancingNode 
 { 
 public: 
-    struct s_Node *left; 
-    struct s_Node *right; 
-    struct s_Node *up; 
-    struct s_Node *down; 
-    struct s_Node *column; 
+    struct s_DancingNode *left; 
+    struct s_DancingNode *right; 
+    struct s_DancingNode *up; 
+    struct s_DancingNode *down; 
+    struct s_DancingNode *column; 
     int row; 
     int col; 
     int nodeCount; 
-}; 
+};*/ 
 
 // Functions to get next index in any direction 
 // for given index (circular in nature)  
@@ -33,7 +33,7 @@ int getDown(int i, int nRow){
 // Create 4 way linked matrix of nodes 
 // called Toroidal due to resemblance to 
 // toroid 
-Node *createToridolMatrix(Node **Matrix, int nRow, int nCol, bool **ProbMat, Node *header) 
+DancingNode *createToridolMatrix(DancingNode **Matrix, int nRow, int nCol, bool **ProbMat, DancingNode *header) 
 { 
     // One extra row for list header nodes 
     // for each column 
@@ -99,72 +99,72 @@ Node *createToridolMatrix(Node **Matrix, int nRow, int nCol, bool **ProbMat, Nod
 } 
   
 // Cover the given node completely 
-void cover(Node *targetNode, Node **Matrix) 
+void cover(DancingNode *targetDancingNode, DancingNode **Matrix) 
 { 
-    Node *row, *rightNode; 
+    DancingNode *row, *rightDancingNode; 
   
     // get the pointer to the header of column 
     // to which this node belong  
-    Node *colNode = targetNode->column; 
+    DancingNode *colDancingNode = targetDancingNode->column; 
   
     // unlink column header from it's neighbors 
-    colNode->left->right = colNode->right; 
-    colNode->right->left = colNode->left; 
+    colDancingNode->left->right = colDancingNode->right; 
+    colDancingNode->right->left = colDancingNode->left; 
   
     // Move down the column and remove each row 
     // by traversing right 
-    for(row = colNode->down; row != colNode; row = row->down) 
+    for(row = colDancingNode->down; row != colDancingNode; row = row->down) 
     { 
-        for(rightNode = row->right; rightNode != row; 
-            rightNode = rightNode->right) 
+        for(rightDancingNode = row->right; rightDancingNode != row; 
+            rightDancingNode = rightDancingNode->right) 
         { 
-            rightNode->up->down = rightNode->down; 
-            rightNode->down->up = rightNode->up; 
+            rightDancingNode->up->down = rightDancingNode->down; 
+            rightDancingNode->down->up = rightDancingNode->up; 
   
             // after unlinking row node, decrement the 
             // node count in column header 
-            Matrix[0][rightNode->col].nodeCount -= 1; 
+            Matrix[0][rightDancingNode->col].nodeCount -= 1; 
         } 
     } 
 } 
   
 // Uncover the given node completely 
-void uncover(Node *targetNode, Node **Matrix) 
+void uncover(DancingNode *targetDancingNode, DancingNode **Matrix) 
 { 
-    Node *rowNode, *leftNode; 
+    DancingNode *rowDancingNode, *leftDancingNode; 
   
     // get the pointer to the header of column 
     // to which this node belong  
-    Node *colNode = targetNode->column; 
+    DancingNode *colDancingNode = targetDancingNode->column; 
   
     // Move down the column and link back 
     // each row by traversing left 
-    for(rowNode = colNode->up; rowNode != colNode; rowNode = rowNode->up) 
+    for(rowDancingNode = colDancingNode->up; rowDancingNode != colDancingNode; rowDancingNode = rowDancingNode->up) 
     { 
-        for(leftNode = rowNode->left; leftNode != rowNode; 
-            leftNode = leftNode->left) 
+        for(leftDancingNode = rowDancingNode->left; leftDancingNode != rowDancingNode; 
+            leftDancingNode = leftDancingNode->left) 
         { 
-            leftNode->up->down = leftNode; 
-            leftNode->down->up = leftNode; 
+            leftDancingNode->up->down = leftDancingNode; 
+            leftDancingNode->down->up = leftDancingNode; 
   
             // after linking row node, increment the 
             // node count in column header 
-            Matrix[0][leftNode->col].nodeCount += 1; 
+            Matrix[0][leftDancingNode->col].nodeCount += 1; 
         } 
     } 
   
     // link the column header from it's neighbors 
-    colNode->left->right = colNode; 
-    colNode->right->left = colNode; 
+    colDancingNode->left->right = colDancingNode; 
+    colDancingNode->right->left = colDancingNode; 
 } 
   
 // Traverse column headers right and  
 // return the column having minimum  
 // node count 
-Node *getMinColumn(Node *header) 
+DancingNode *getMinColumn(DancingNode *header) 
 { 
-    Node *h = header; 
-    Node *min_col = h->right; 
+    DancingNode *h = header; 
+    DancingNode *min_col = h->right; 
     h = h->right->right; 
     do
     { 
@@ -179,12 +179,61 @@ Node *getMinColumn(Node *header)
 } 
   
   
-void printSolutions(vector <Node*> solutions) 
+void printSolutions(vector <DancingNode*> solutions) 
 { 
     cout<<"Printing Solutions: "; 
-    vector<Node*>::iterator i; 
+    vector<DancingNode*>::iterator i; 
   
     for(i = solutions.begin(); i!=solutions.end(); i++) 
         cout<<(*i)->row<<" "; 
     cout<<"\n"; 
+}
+
+
+
+// Search for exact covers 
+void search(int k, DancingNode *header, vector<DancingNode*> solutions, DancingNode **Matrix) 
+{ 
+    DancingNode *rowNode; 
+    DancingNode *rightNode; 
+    DancingNode *leftNode; 
+    DancingNode *column; 
+  
+    // if no column left, then we must 
+    // have found the solution 
+    if(header->right == header) 
+    { 
+        printSolutions(solutions); 
+        return; 
+    } 
+  
+    // choose column deterministically 
+    column = getMinColumn(header); 
+  
+    // cover chosen column 
+    cover(column, Matrix); 
+  
+    for(rowNode = column->down; rowNode != column;  
+        rowNode = rowNode->down ) 
+    { 
+        solutions.push_back(rowNode); 
+  
+        for(rightNode = rowNode->right; rightNode != rowNode; 
+            rightNode = rightNode->right) 
+            cover(rightNode, Matrix); 
+  
+        // move to level k+1 (recursively) 
+        search(k+1, header, solutions, Matrix); 
+  
+        // if solution in not possible, backtrack (uncover) 
+        // and remove the selected row (set) from solution 
+        solutions.pop_back(); 
+  
+        column = rowNode->column; 
+        for(leftNode = rowNode->left; leftNode != rowNode; 
+            leftNode = leftNode->left) 
+            uncover(leftNode, Matrix); 
+    } 
+  
+    uncover(column, Matrix); 
 } 
