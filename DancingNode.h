@@ -21,14 +21,14 @@ int getUp(int i, int nRow);
 
 int getDown(int i, int nRow);
 
-DancingNode *createToridolMatrix(DancingNode **Matrix, int nRow, int nCol, bool **ProbMat, DancingNode *header);
+DancingNode *createToridolMatrix(std::vector<std::vector<DancingNode>> &Matrix, int nRow, int nCol, std::vector<std::vector<bool>> &ProbMat, DancingNode *header);
 
-void cover(DancingNode *targetDancingNode, DancingNode **Matrix);
+void cover(DancingNode *targetDancingNode, std::vector<std::vector<DancingNode>> &Matrix);
 
-void uncover(DancingNode *targetDancingNode, DancingNode **Matrix);
+void uncover(DancingNode *targetDancingNode, std::vector<std::vector<DancingNode>> &Matrix);
 
 DancingNode *getMinColumn(DancingNode *header);
 
-void printSolutions(std::vector<DancingNode*> solutions); 
+void printSolutions(std::vector<DancingNode*> &solutions, std::vector<std::vector<int>> &grid); 
 
-void search(int k, DancingNode *header, std::vector<DancingNode*> solutions, DancingNode **Matrix) 
+void search(int k, DancingNode *header, std::vector<DancingNode*> &solutions, std::vector<std::vector<DancingNode>> &Matrix, std::vector<std::vector<int>> &grid); 

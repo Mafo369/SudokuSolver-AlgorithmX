@@ -24,16 +24,16 @@ int getLeft(int i, int nCol){
     return (i-1 < 0) ? nCol-1 : i-1 ; 
 } 
 int getUp(int i, int nRow){
-    return (i-1 < 0) ? nRow : i-1 ; 
+    return (i-1 < 0) ? nRow-1 : i-1 ; 
 }   
 int getDown(int i, int nRow){
-    return (i+1) % (nRow+1); 
+    return (i+1) % (nRow); 
 } 
   
 // Create 4 way linked matrix of nodes 
 // called Toroidal due to resemblance to 
 // toroid 
-DancingNode *createToridolMatrix(DancingNode **Matrix, int nRow, int nCol, bool **ProbMat, DancingNode *header) 
+DancingNode *createToridolMatrix(vector<vector<DancingNode>> &Matrix, int nRow, int nCol, vector<vector<bool>> &ProbMat, DancingNode *header) 
 { 
     // One extra row for list header nodes 
     // for each column 
@@ -44,9 +44,9 @@ DancingNode *createToridolMatrix(DancingNode **Matrix, int nRow, int nCol, bool 
             // If it's 1 in the problem matrix then  
             // only create a node  
             if(ProbMat[i][j]) 
-            { 
+            {   
                 int a, b; 
-  
+                //Matrix[i].push_back(DancingNode()); 
                 // If it's 1, other than 1 in 0th row 
                 // then count it as node of column  
                 // and increment node count in column header 
@@ -61,17 +61,16 @@ DancingNode *createToridolMatrix(DancingNode **Matrix, int nRow, int nCol, bool 
                 Matrix[i][j].col = j; 
   
                 // Link the node with neighbors 
-  
                 // Left pointer 
                 a = i; b = j; 
                 do{ b = getLeft(b, nCol); } while(!ProbMat[a][b] && b != j); 
                 Matrix[i][j].left = &Matrix[i][b]; 
-  
+                
                 // Right pointer 
                 a = i; b = j; 
                 do { b = getRight(b, nCol); } while(!ProbMat[a][b] && b != j); 
                 Matrix[i][j].right = &Matrix[i][b]; 
-  
+                
                 // Up pointer 
                 a = i; b = j; 
                 do { a = getUp(a, nRow); } while(!ProbMat[a][b] && a != i); 
@@ -81,6 +80,7 @@ DancingNode *createToridolMatrix(DancingNode **Matrix, int nRow, int nCol, bool 
                 a = i; b = j; 
                 do { a = getDown(a, nRow); } while(!ProbMat[a][b] && a != i); 
                 Matrix[i][j].down = &Matrix[a][j]; 
+                
             } 
         } 
     } 
@@ -99,7 +99,7 @@ DancingNode *createToridolMatrix(DancingNode **Matrix, int nRow, int nCol, bool 
 } 
   
 // Cover the given node completely 
-void cover(DancingNode *targetDancingNode, DancingNode **Matrix) 
+void cover(DancingNode *targetDancingNode, vector<vector<DancingNode>> &Matrix) 
 { 
     DancingNode *row, *rightDancingNode; 
   
@@ -129,7 +129,7 @@ void cover(DancingNode *targetDancingNode, DancingNode **Matrix)
 } 
   
 // Uncover the given node completely 
-void uncover(DancingNode *targetDancingNode, DancingNode **Matrix) 
+void uncover(DancingNode *targetDancingNode, vector<vector<DancingNode>> &Matrix) 
 { 
     DancingNode *rowDancingNode, *leftDancingNode; 
   
@@ -163,7 +163,7 @@ void uncover(DancingNode *targetDancingNode, DancingNode **Matrix)
 // node count 
 DancingNode *getMinColumn(DancingNode *header) 
 { 
-    DancingNode *h = header; 
+    DancingNode *h = header;
     DancingNode *min_col = h->right; 
     h = h->right->right; 
     do
@@ -179,43 +179,51 @@ DancingNode *getMinColumn(DancingNode *header)
 } 
   
   
-void printSolutions(vector <DancingNode*> solutions) 
+void printSolutions(vector <DancingNode*> &solutions, vector<vector<int>> &grid) 
 { 
-    cout<<"Printing Solutions: "; 
+
+    cout<<"Printing Solutions: "<< endl;
     vector<DancingNode*>::iterator i; 
   
-    for(i = solutions.begin(); i!=solutions.end(); i++) 
-        cout<<(*i)->row<<" "; 
-    cout<<"\n"; 
+    /*for(i = solutions.begin(); i!=solutions.end(); i++){
+        //cout<<(*i)->row<<" ";
+        int r = (*i)->column->col / 9;
+        int c = (*i)->column->col % 9;
+        int answer = (*i)->right->column->col;
+        int num = (answer % 9) + 1;
+        grid[r][c] = num;
+    }*/
 }
 
 
 
 // Search for exact covers 
-void search(int k, DancingNode *header, vector<DancingNode*> solutions, DancingNode **Matrix) 
+void search(int k, DancingNode *header, vector<DancingNode*> &solutions, vector<vector<DancingNode>> &Matrix, vector<vector<int>> &grid) 
 { 
     DancingNode *rowNode; 
     DancingNode *rightNode; 
     DancingNode *leftNode; 
     DancingNode *column; 
-  
+    //cout<<"IN"<<endl; 
     // if no column left, then we must 
     // have found the solution 
     if(header->right == header) 
-    { 
-        printSolutions(solutions); 
+    {
+        //cout << "OUT" << endl; 
+        //printSolutions(solutions, grid); 
         return; 
     } 
   
     // choose column deterministically 
     column = getMinColumn(header); 
-  
+    //cout << "COVERING" <<endl; 
     // cover chosen column 
     cover(column, Matrix); 
   
     for(rowNode = column->down; rowNode != column;  
         rowNode = rowNode->down ) 
-    { 
+    {
+        //cout << "hey u" << endl; 
         solutions.push_back(rowNode); 
   
         for(rightNode = rowNode->right; rightNode != rowNode; 
@@ -223,7 +231,7 @@ void search(int k, DancingNode *header, vector<DancingNode*> solutions, DancingN
             cover(rightNode, Matrix); 
   
         // move to level k+1 (recursively) 
-        search(k+1, header, solutions, Matrix); 
+        search(k+1, header, solutions, Matrix, grid); 
   
         // if solution in not possible, backtrack (uncover) 
         // and remove the selected row (set) from solution 

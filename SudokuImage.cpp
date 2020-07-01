@@ -14,7 +14,7 @@ using namespace ml;
 #define EMPTY_CELL 0
 #define CONSTRAINTS 4
 #define MIN_VALUE 1
-#define MAX_VALUE SIZE
+#define MAX_VALUE 9
 #define COVER_START_INDEX 1
 
 using namespace std;
@@ -23,7 +23,7 @@ int indexInCoverMatrix(int row, int col, int num){
     return (row - 1) * SIZE * SIZE + (col- 1) * SIZE + (num - 1);
 }
 
-int createBoxConstraints(vector<vector<int> > &coverMatrix, int header){
+int createBoxConstraints(vector<vector<bool> > &coverMatrix, int header){
     for (int row = COVER_START_INDEX; row <= SIZE; row += BOX_SIZE) {
       for (int column = COVER_START_INDEX; column <= SIZE; column += BOX_SIZE) {
         for (int n = COVER_START_INDEX; n <= SIZE; n++, header++) {
@@ -31,7 +31,7 @@ int createBoxConstraints(vector<vector<int> > &coverMatrix, int header){
             for (int columnDelta = 0; columnDelta < BOX_SIZE; columnDelta++) {
               int index = indexInCoverMatrix(row + rowDelta, column + columnDelta, n);
               //matrix[index][header] = 1;
-              coverMatrix[index][header] = 1;
+              coverMatrix[index][header] = true;
             }
           }
         }
@@ -40,12 +40,12 @@ int createBoxConstraints(vector<vector<int> > &coverMatrix, int header){
     return header;
 }
 
-int createColumnConstraints(vector<vector<int>> &coverMatrix, int header){
+int createColumnConstraints(vector<vector<bool>> &coverMatrix, int header){
     for (int column = COVER_START_INDEX; column <= SIZE; column++) {
       for (int n = COVER_START_INDEX; n <= SIZE; n++, header++) {
         for (int row = COVER_START_INDEX; row <= SIZE; row++) {
           int index = indexInCoverMatrix(row, column, n);
-            coverMatrix[index][header] = 1;
+            coverMatrix[index][header] = true;
 
         }
       }
@@ -54,13 +54,13 @@ int createColumnConstraints(vector<vector<int>> &coverMatrix, int header){
     return header;
 }
 
-int createRowConstraints(vector<vector<int>> &coverMatrix, int header){
+int createRowConstraints(vector<vector<bool>> &coverMatrix, int header){
     for (int row = COVER_START_INDEX; row <= SIZE; row++) {
       for (int n = COVER_START_INDEX; n <= SIZE; n++, header++) {
         for (int column = COVER_START_INDEX; column <= SIZE; column++) {
             int index = indexInCoverMatrix(row, column, n);
             
-            coverMatrix[index][header] = 1;
+            coverMatrix[index][header] = true;
         }
       }
     }
@@ -68,13 +68,13 @@ int createRowConstraints(vector<vector<int>> &coverMatrix, int header){
     return header;
 }
 
-int createCellConstraints(vector<vector<int>> &coverMatrix, int header){
+int createCellConstraints(vector<vector<bool>> &coverMatrix, int header){
     for (int row = COVER_START_INDEX; row <= SIZE; row++) {
         for (int column = COVER_START_INDEX; column <= SIZE; column++, header++) {
             for (int n = COVER_START_INDEX; n <= SIZE; n++) {
                 int index = indexInCoverMatrix(row, column, n);
                 
-            coverMatrix[index][header] = 1;
+            coverMatrix[index][header] = true;
 
             }
         }
@@ -82,7 +82,7 @@ int createCellConstraints(vector<vector<int>> &coverMatrix, int header){
     return header;
 }
 
-void createCoverMatrix(vector<vector<int>> &coverMatrix){ 
+void createCoverMatrix(vector<vector<bool>> &coverMatrix){ 
     //coverMatrix[SIZE*SIZE*MAX_VALUE][SIZE * SIZE * CONSTRAINTS];
 
     int header = 0;
@@ -93,7 +93,7 @@ void createCoverMatrix(vector<vector<int>> &coverMatrix){
 
 }
 
-void convertInCoverMatrix(vector<vector<int>> &grid, vector<vector<int>> &coverMatrix){
+void convertInCoverMatrix(vector<vector<int>> &grid, vector<vector<bool>> &coverMatrix){
     //createCoverMatrix(coverMatrix);
     
     int header = 0;
@@ -106,11 +106,10 @@ void convertInCoverMatrix(vector<vector<int>> &grid, vector<vector<int>> &coverM
     for (int row = COVER_START_INDEX; row <= SIZE; row++) {
       for (int column = COVER_START_INDEX; column <= SIZE; column++) {
         int n = grid[row - 1][column - 1];
-
         if (n != EMPTY_CELL) {
           for (int num = MIN_VALUE; num <= MAX_VALUE; num++) {
             if (num != n) {
-                std::fill(coverMatrix[indexInCoverMatrix(row, column, num)].begin(), coverMatrix[indexInCoverMatrix(row, column, num)].end(), 0);
+                std::fill(coverMatrix[indexInCoverMatrix(row, column, num)].begin(), coverMatrix[indexInCoverMatrix(row, column, num)].end(), false);
             }
           }
         }
@@ -431,17 +430,6 @@ int main( int argc, char* argv[] ){
     // list header node of first column
     DancingNode *header = new DancingNode();
 
-    // Matrix to contain nodes of linked mesh
-    DancingNode Matrix[MAX_ROW][MAX_COL];
-
-    // Problem Matrix
-    bool ProbMat[MAX_ROW][MAX_COL];
-
-    // vector containing solutions
-    vector <DancingNode*> solutions;
-
-    // Number of rows and columns in problem matrix
-    int nRow = 9,nCol = 9;
 
     //int grid[nRow][9];
     vector<vector <int> > grid(9, vector<int>(9))  ;
@@ -459,35 +447,56 @@ int main( int argc, char* argv[] ){
              
             Moments m = cv::moments(currentCell, true);
             int area = m.m00;
-            imshow("currentCell" , currentCell);
-            waitKey(0);
+            //imshow("currentCell" , currentCell);
+            //waitKey(0);
 
             if(area > 20){
                 Mat cloneImg = preprocessImage(currentCell, numRows, numCols);
                 Mat response;
                 float number = knn->findNearest(cloneImg, knn->getDefaultK(), response, noArray(), noArray());
                 printf("%d ", (int)number);
-                //grid[i][j] = (int)number;
-                grid[i].push_back((int)number);
+                grid[i][j] = (int)number;
+                //grid[i].push_back((int)number);
             }
             else{
-                //grid[i][j] = 0;
-                grid[i].push_back(0);
+                grid[i][j] = 0;
+                //grid[i].push_back(0);
                 printf("0 ");
             }
         }
         printf("\n");
     }
+    waitKey();
     //int coverMatrix[SIZE*SIZE*MAX_VALUE][SIZE * SIZE * CONSTRAINTS];
-    int rowsCover = SIZE * SIZE * MAX_VALUE;
+    int rowsCover = SIZE * SIZE * MAX_VALUE ;
     int colsCover = SIZE * SIZE * CONSTRAINTS;
-    cout << rowsCover << " " << colsCover << endl;
-    vector<vector<int>> coverMatrix(rowsCover, vector<int>(colsCover)) ;
-    
+    //cout << rowsCover << " " << colsCover << endl;
+    vector<vector<bool>> coverMatrix(rowsCover, vector<bool>(colsCover)) ;
+    // missing header row 
     convertInCoverMatrix(grid, coverMatrix);  
     
+    // Matrix to contain nodes of linked mesh
+    //DancingNode Matrix[MAX_ROW][MAX_COL];
+    vector<vector<DancingNode>> Matrix(rowsCover+1, vector<DancingNode>(colsCover));
 
-    
+    // vector containing solutions
+    vector <DancingNode*> solutions;
+
+    vector<bool> headers(colsCover);
+    fill(headers.begin(), headers.end(), true);
+    coverMatrix.push_back(headers);
+    rotate(coverMatrix.rbegin(), coverMatrix.rbegin() + 1, coverMatrix.rend());
+
+    createToridolMatrix(Matrix, rowsCover, colsCover, coverMatrix, header);
+    search(0, header, solutions, Matrix, grid ); 
+    printSolutions(solutions, grid); 
+    for(int j=0;j<9;j++){
+        for(int i=0;i<9;i++){
+            printf("%d ", grid[i][j]);
+        }
+        printf("\n");
+    }
+
     //waitKey();
     //cout << coverMatrix << endl;
 	return 0;
