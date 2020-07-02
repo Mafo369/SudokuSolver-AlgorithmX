@@ -455,11 +455,11 @@ int main( int argc, char* argv[] ){
                 Mat response;
                 float number = knn->findNearest(cloneImg, knn->getDefaultK(), response, noArray(), noArray());
                 printf("%d ", (int)number);
-                grid[i][j] = (int)number;
+                grid[j][i] = (int)number;
                 //grid[i].push_back((int)number);
             }
             else{
-                grid[i][j] = 0;
+                grid[j][i] = 0;
                 //grid[i].push_back(0);
                 printf("0 ");
             }
@@ -489,9 +489,9 @@ int main( int argc, char* argv[] ){
 
     createToridolMatrix(Matrix, rowsCover, colsCover, coverMatrix, header);
     search(0, header, solutions, Matrix, grid ); 
-    printSolutions(solutions, grid); 
-    for(int j=0;j<9;j++){
-        for(int i=0;i<9;i++){
+    //printSolutions(solutions, grid); 
+    for(int i=0;i<9;i++){
+        for(int j=0;j<9;j++){
             printf("%d ", grid[i][j]);
         }
         printf("\n");

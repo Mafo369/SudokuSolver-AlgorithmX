@@ -178,21 +178,30 @@ DancingNode *getMinColumn(DancingNode *header)
     return min_col; 
 } 
   
-  
-void printSolutions(vector <DancingNode*> &solutions, vector<vector<int>> &grid) 
-{ 
 
+  
+void printSolutions(vector<DancingNode*> &solutions, vector<vector<int>> &grid) 
+{ 
+    
     cout<<"Printing Solutions: "<< endl;
     vector<DancingNode*>::iterator i; 
   
-    /*for(i = solutions.begin(); i!=solutions.end(); i++){
-        //cout<<(*i)->row<<" ";
-        int r = (*i)->column->col / 9;
-        int c = (*i)->column->col % 9;
-        int answer = (*i)->right->column->col;
-        int num = (answer % 9) + 1;
-        grid[r][c] = num;
-    }*/
+    for(i = solutions.begin(); i!=solutions.end(); i++){
+        cout<<(*i)->row<<endl;
+        
+        int r = (*i)->row / 82 ;
+        int c = ((*i)->row / 9 ) % 9;
+        int answer = ((*i)->row % 9) ;
+        if(answer == 0){
+            answer = 9;
+        }
+        // FIX -> c*9 % 9 == 0 is making column conflicts
+        // TODO..
+
+        //int num = (answer % 9) + 1;
+        
+        grid[r][c] = answer;
+    }
 }
 
 
@@ -210,7 +219,7 @@ void search(int k, DancingNode *header, vector<DancingNode*> &solutions, vector<
     if(header->right == header) 
     {
         //cout << "OUT" << endl; 
-        //printSolutions(solutions, grid); 
+        printSolutions(solutions, grid); 
         return; 
     } 
   
