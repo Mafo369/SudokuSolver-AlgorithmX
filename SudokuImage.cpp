@@ -119,8 +119,13 @@ void convertInCoverMatrix(vector<vector<int>> &grid, vector<vector<bool>> &cover
 
 
 int main( int argc, char* argv[] ){
-	// Read original image 
-	Mat src = imread("testPhotos/sudoku.jpg", IMREAD_GRAYSCALE );
+	/******************************** Read original image ********************************/
+    if(argc != 2){
+        printf("Usage : %s sudokuPath", argv[0]);
+        exit(1);
+    } 
+    char *sudokuName = argv[1];
+	Mat src = imread(sudokuName, IMREAD_GRAYSCALE );
 
 	//if fail to read the image
 	if (!src.data){
@@ -132,7 +137,7 @@ int main( int argc, char* argv[] ){
 	imshow("original image",src);
     //waitKey();
     
-    /**************************** Thresholding ****************************/ 
+    /*********************************** Thresholding ***************************************/ 
 
 	Mat thresholded;
 
@@ -149,7 +154,7 @@ int main( int argc, char* argv[] ){
     //imshow("outer box", outerBox);
 	
 	
-    /***************************** Borders *******************************/
+    /************************************ Borders ****************************************/
 
     int max=-1;
 
@@ -456,11 +461,9 @@ int main( int argc, char* argv[] ){
                 float number = knn->findNearest(cloneImg, knn->getDefaultK(), response, noArray(), noArray());
                 printf("%d ", (int)number);
                 grid[j][i] = (int)number;
-                //grid[i].push_back((int)number);
             }
             else{
                 grid[j][i] = 0;
-                //grid[i].push_back(0);
                 printf("0 ");
             }
         }

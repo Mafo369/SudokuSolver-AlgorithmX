@@ -1,19 +1,6 @@
 #include "DancingNode.h"
 
 using namespace std; 
-  
-/*struct s_DancingNode 
-{ 
-public: 
-    struct s_DancingNode *left; 
-    struct s_DancingNode *right; 
-    struct s_DancingNode *up; 
-    struct s_DancingNode *down; 
-    struct s_DancingNode *column; 
-    int row; 
-    int col; 
-    int nodeCount; 
-};*/ 
 
 // Functions to get next index in any direction 
 // for given index (circular in nature)  
@@ -183,22 +170,18 @@ DancingNode *getMinColumn(DancingNode *header)
 void printSolutions(vector<DancingNode*> &solutions, vector<vector<int>> &grid) 
 { 
     
-    cout<<"Printing Solutions: "<< endl;
+    cout<<"Printing Solutions: \n"<< endl;
     vector<DancingNode*>::iterator i; 
   
     for(i = solutions.begin(); i!=solutions.end(); i++){
-        cout<<(*i)->row<<endl;
-        
-        int r = (*i)->row / 82 ;
-        int c = ((*i)->row / 9 ) % 9;
-        int answer = ((*i)->row % 9) ;
+        //cout<<(*i)->row<<endl;
+        int coverRow = (*i)->row - 1;
+        int r = coverRow / 81 ;
+        int c = (coverRow / 9 ) % 9;
+        int answer = (coverRow % 9) + 1;
         if(answer == 0){
             answer = 9;
         }
-        // FIX -> c*9 % 9 == 0 is making column conflicts
-        // TODO..
-
-        //int num = (answer % 9) + 1;
         
         grid[r][c] = answer;
     }
