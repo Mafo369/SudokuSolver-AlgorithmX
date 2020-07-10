@@ -170,7 +170,7 @@ DancingNode *getMinColumn(DancingNode *header)
 void printSolutions(vector<DancingNode*> &solutions, vector<vector<int>> &grid) 
 { 
     
-    cout<<"Printing Solutions: \n"<< endl;
+    cout<<"\nPrinting Solution: \n"<< endl;
     vector<DancingNode*>::iterator i; 
   
     for(i = solutions.begin(); i!=solutions.end(); i++){
