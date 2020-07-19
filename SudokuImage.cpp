@@ -50,7 +50,7 @@ int main( int argc, char* argv[] ){
 	imshow("original image",src);
    
 
-    /*********************************** Preprocessing Image ***************************************/ 
+    /*********************************** Preprocessing Image **************************************/ 
 
 	Mat thresholded;
 
