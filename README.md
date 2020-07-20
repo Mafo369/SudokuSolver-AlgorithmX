@@ -1,4 +1,4 @@
-# SudokuSolver
+# SudokuSolver with Dancing Links
 
 A Sudoku Solver made in C++ using the [OpenCV](https://opencv.org/) Interface to read and extract a sudoku from an image and solve it with [Knuth's Dancing Links technique](https://en.wikipedia.org/wiki/Dancing_Links) 
 and [AlgorithmX](https://en.wikipedia.org/wiki/Knuth%27s_Algorithm_X).

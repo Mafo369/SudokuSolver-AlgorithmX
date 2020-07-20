@@ -272,14 +272,9 @@ int main( int argc, char* argv[] ){
     Ptr<KNearest> knn;
     knn = KNearest::create();
 
-    string trainPath = "test_train/train-images.idx3-ubyte";
-    string labelsPath = "test_train/train-labels.idx1-ubyte";
-
     int numRows, numCols, numImages;
     Mat trainingVectors, trainingClasses;
 
-    //loadMNIST(trainPath, labelsPath, numRows, numCols, numImages, trainingVectors, trainingClasses  );
-    
     // Read the dataset images and respective labels, and put it into vectors
     loadDigitsDataset(trainingVectors, trainingClasses, numRows, numCols, numImages  );
     
