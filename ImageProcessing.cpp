@@ -170,8 +170,8 @@ Mat preprocessImage(Mat img, int numRows, int numCols)
         resize(region, cloneImg, Size(numRows, numCols), 0, 0, INTER_NEAREST);   
 
     cloneImg.convertTo(cloneImg, CV_32FC1, 1.0/255.0 );
-    imshow("clone img", cloneImg);
-    waitKey(0);
+    //imshow("clone img", cloneImg);
+    //waitKey(0);
     cloneImg = cloneImg.reshape(1,1);
     return cloneImg;
 }

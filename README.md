@@ -27,3 +27,18 @@ make
 
 ## Example
 
+Original Image
+
+![alt text](example/sudoku.jpg)
+
+Preprocess Image
+
+![alt text](example/preprocess.png)
+
+Read digits
+
+![alt text](example/reading.png)
+
+Solving Sudoku
+
+![alt text](example/solving.png)
