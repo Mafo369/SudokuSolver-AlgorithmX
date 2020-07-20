@@ -35,7 +35,7 @@ Preprocess Image:
 
 ![alt text](example/preprocess.png)
 
-Train KNearest mode and read digits:
+Train KNearest model and read digits:
 
 ![alt text](example/reading.png)
 
