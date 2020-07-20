@@ -27,18 +27,18 @@ make
 
 ## Example
 
-Original Image
+Original Image:
 
 ![alt text](example/sudoku.jpg)
 
-Preprocess Image
+Preprocess Image:
 
 ![alt text](example/preprocess.png)
 
-Read digits
+Train KNearest mode and read digits:
 
 ![alt text](example/reading.png)
 
-Solving Sudoku
+Solve Sudoku with Algorithm X:
 
 ![alt text](example/solving.png)
